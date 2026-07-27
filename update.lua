@@ -1,6 +1,8 @@
 -- update [baseurl]: sync all warehouse files from a raw-file host (e.g. GitHub raw)
--- first run: update https://raw.githubusercontent.com/<user>/<repo>/main/cc-scripts/
+-- first run: update https://raw.githubusercontent.com/21NWillis/minecraft-warehouse-os/main/
 -- after that: update           (base url is remembered)
+-- NOTE: this repo's root IS the cc-scripts folder, so the base ends in /main/
+--       (NOT /main/cc-scripts/) - manifest.txt and data/ live at the repo root.
 local BASE_FILE = ".updatebase"
 
 local args = { ... }
