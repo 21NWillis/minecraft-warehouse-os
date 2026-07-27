@@ -2,5 +2,5 @@
 .report.txt
 
 # gradle build output
-datacenter/build/
-datacenter/.gradle/
+paperclip/build/
+paperclip/.gradle/

@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "paperclip:block/gpu_b800"
+    }
+  }
+}
