@@ -76,6 +76,7 @@ verify("floor 5x5", schematic.floor(5, 5, "minecraft:stone"))
 verify("hollow box 5x4x5 w/ floor", schematic.hollowBox(5, 4, 5, "minecraft:stone", { floor = true }))
 verify("solid 3x3x3", schematic.solid(3, 3, 3, "minecraft:dirt"))
 verify("cylinder r4 h6", schematic.cylinder(4, 6, "minecraft:glass"))
+verify("evil HQ 9x20", schematic.evilTower(9, 20))
 
 -- out-of-material stops cleanly partway (no crash, reports remaining)
 do

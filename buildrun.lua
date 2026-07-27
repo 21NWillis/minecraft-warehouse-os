@@ -20,6 +20,7 @@ local function usage()
   print("  floor W D block")
   print("  solid W H D block")
   print("  cylinder R H block")
+  print("  evilhq W H [wall glow spire]   Paperclip Corp HQ")
 end
 
 local s, block
@@ -40,6 +41,11 @@ elseif shape == "cylinder" then
   block = args[4]
   if not (r and h and block) then usage() return end
   s = schematic.cylinder(r, h, block)
+elseif shape == "evilhq" then
+  local w, h = tonumber(args[2]), tonumber(args[3])
+  if not (w and h) then usage() return end
+  -- palette optional: buildrun evilhq 9 20 [wall glow spire]
+  s = schematic.evilTower(w, h, { wall = args[4], glow = args[5], spire = args[6] })
 else
   usage() return
 end

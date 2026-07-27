@@ -86,6 +86,42 @@ function schematic.cylinder(radius, h, block)
   return s
 end
 
+-- an ominous corporate HQ: dark hollow tower, a glowing accent band, corner
+-- spikes, and a rooftop antenna. Multi-material; the builder pulls each block
+-- type from the turtle's inventory. palette keys: wall, glow, spire.
+function schematic.evilTower(w, h, palette)
+  palette = palette or {}
+  local wall = palette.wall or "minecraft:blackstone"
+  local glow = palette.glow or "minecraft:sea_lantern"
+  local spire = palette.spire or "minecraft:obsidian"
+  local antenna = 4
+  local s = schematic.new(w, h + antenna, w)
+  local bandY = math.floor(h * 0.72)
+  for y = 0, h - 1 do
+    for x = 0, w - 1 do
+      for z = 0, w - 1 do
+        local edge = x == 0 or x == w - 1 or z == 0 or z == w - 1
+        local platform = (y % 5 == 0)              -- interior floors
+        if edge then
+          s:set(x, y, z, y == bandY and glow or wall)  -- glowing sign band
+        elseif platform then
+          s:set(x, y, z, wall)
+        end
+      end
+    end
+  end
+  -- menacing corner spikes rising above the roof
+  local corners = { { 0, 0 }, { 0, w - 1 }, { w - 1, 0 }, { w - 1, w - 1 } }
+  for _, c in ipairs(corners) do
+    for k = 0, 2 do s:set(c[1], h + k, c[2], spire) end
+  end
+  -- central antenna, glowing tip
+  local mid = math.floor(w / 2)
+  for k = 0, antenna - 1 do s:set(mid, h + k, mid, spire) end
+  s:set(mid, h + antenna - 1, mid, glow)
+  return s
+end
+
 -- ---- build planner ---------------------------------------------------------
 
 -- Produce placements in a build-safe order: bottom layer first, then up. Within
