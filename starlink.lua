@@ -30,8 +30,13 @@ end
 -- fire a latency probe at one peer (or all if target nil); result lands in
 -- peers[name].rtt when the pong returns during pump()
 function starlink:ping(target)
+  local now = os.epoch("utc")
+  -- drop probes that never got a pong (offline peer) so `pending` stays bounded
+  for id, sentAt in pairs(self.pending) do
+    if now - sentAt > 10000 then self.pending[id] = nil end
+  end
   self.seq = self.seq + 1
-  self.pending[self.seq] = os.epoch("utc")
+  self.pending[self.seq] = now
   rednet.broadcast({ type = "ping", id = self.seq, from = self.node,
                      to = target }, PROTO)
 end
