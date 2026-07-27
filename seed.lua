@@ -44,19 +44,19 @@ end
 f.close()
 
 local function pull(id, want)
-  local moved = 0
+  local planned, actual = 0, 0
   local tasks = {}
   for _, s in ipairs(slotsByItem[id] or {}) do
-    if moved >= want then break end
-    local take = math.min(want - moved, s.count)
-    moved = moved + take       -- optimistic; corrected by actual pushItems below
+    if planned >= want then break end
+    local take = math.min(want - planned, s.count)
+    planned = planned + take   -- for loop control only
     local slot = s.slot
     tasks[#tasks + 1] = function()
-      controller.pushItems(deliveryName, slot, take)
+      actual = actual + controller.pushItems(deliveryName, slot, take)  -- real moved count
     end
   end
   if #tasks > 0 then parallel.waitForAll(table.unpack(tasks)) end
-  return moved
+  return actual
 end
 
 print("=== Paperclip bootstrap seed ===")
