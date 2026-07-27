@@ -32,19 +32,32 @@ local okCount, failCount = 0, 0
 for path in manifest:gmatch("[^\r\n]+") do
   write(path .. " ... ")
   local r, ferr = http.get(base .. path)
-  if r then
-    local body = r.readAll()
-    r.close()
-    local dir = fs.getDir(path)
-    if dir ~= "" then fs.makeDir(dir) end
-    local out = fs.open(path, "w")
-    out.write(body)
-    out.close()
-    print(("%d KB"):format(math.ceil(#body / 1024)))
-    okCount = okCount + 1
-  else
+  if not r then
     print("FAILED: " .. tostring(ferr))
     failCount = failCount + 1
+  else
+    local body = r.readAll()
+    r.close()
+    local existing = fs.exists(path) and fs.getSize(path) or 0
+    local free = fs.getFreeSpace("/") + existing
+    if #body + 512 > free then
+      print(("FAILED: need %dKB, %dKB free"):format(math.ceil(#body / 1024), math.floor(free / 1024)))
+      print("  disk too small - was computer_space_limit raised + server restarted?")
+      failCount = failCount + 1
+    else
+      local dir = fs.getDir(path)
+      if dir ~= "" then fs.makeDir(dir) end
+      local out = fs.open(path, "w")
+      if not out then
+        print("FAILED: cannot open for writing")
+        failCount = failCount + 1
+      else
+        out.write(body)
+        out.close()
+        print(("%d KB"):format(math.ceil(#body / 1024)))
+        okCount = okCount + 1
+      end
+    end
   end
 end
 print(("updated %d files, %d failed"):format(okCount, failCount))
