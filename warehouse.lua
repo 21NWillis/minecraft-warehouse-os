@@ -1,7 +1,7 @@
 -- warehouse v3: storefront touch UI + recipe-aware index + batched transfers
 -- usage: warehouse             (dashboard + command prompt)
 --        warehouse install     (write startup.lua so it runs on boot)
--- terminal: find <text> | get <text> [count] | put | refresh | stats | quit
+-- terminal: find <text> | get/craft <text> [count] | put | refresh | stats | quit
 -- monitor:  tap card = withdraw stack | FIND = on-screen keyboard
 --           < > pages | PUT deposits barrel | SCAN reindexes
 
@@ -63,6 +63,27 @@ local function displayName(id)
   if db then return db.name(id) end
   local pretty = id:gsub("^[^:]+:", ""):gsub("_", " ")
   return pretty:sub(1, 1):upper() .. pretty:sub(2)
+end
+
+-- ------------------------------------------------------------------- factory
+local PROTO = "gigafactory"
+local planner
+do
+  local ok, mod = pcall(require, "planner")
+  if ok then planner = mod end
+end
+
+local crafters = {}   -- rednet id -> { name = peripheral name, seen = clock }
+for _, side in ipairs(rs.getSides()) do
+  if peripheral.getType(side) == "modem" then rednet.open(side) end
+end
+
+local function pickCrafter()
+  rednet.broadcast({ type = "ping" }, PROTO)
+  sleep(1)
+  for id, c in pairs(crafters) do
+    if os.clock() - c.seen < 60 then return id, c.name end
+  end
 end
 
 -- --------------------------------------------------------------------- index
@@ -135,6 +156,84 @@ local function deposit()
   end
   if #tasks > 0 then parallel.waitForAll(table.unpack(tasks)) end
   return moved
+end
+
+-- turtle 4x4 inventory slots that form the 3x3 crafting grid
+local TURTLE_GRID = { 1, 2, 3, 5, 6, 7, 9, 10, 11 }
+
+-- load one crafting batch into the turtle; returns how many crafts were loaded
+local function loadBatch(crafterName, step, batch)
+  local loadable = batch
+  for gridSlot, itemId in pairs(step.picks) do
+    local entry = index[itemId]
+    if not entry then return 0, "no " .. displayName(itemId) .. " in storage" end
+    local pushed, tasks = 0, {}
+    local wanted = batch
+    for _, s in ipairs(entry.slots) do
+      if wanted <= 0 then break end
+      local take = math.min(wanted, s.count)
+      wanted = wanted - take
+      local slot = s.slot
+      tasks[#tasks + 1] = function()
+        pushed = pushed + timed("push", controller.pushItems, crafterName, slot, take, TURTLE_GRID[gridSlot])
+      end
+    end
+    if #tasks > 0 then parallel.waitForAll(table.unpack(tasks)) end
+    if pushed < loadable then loadable = pushed end
+  end
+  return loadable
+end
+
+local function unloadTurtle(crafterName)
+  local tasks = {}
+  for t = 1, 16 do
+    tasks[#tasks + 1] = function() timed("push", controller.pullItems, crafterName, t) end
+  end
+  parallel.waitForAll(table.unpack(tasks))
+end
+
+local function executeStep(step, crafterId, crafterName, report)
+  local remaining = step.times
+  while remaining > 0 do
+    local loaded, err = loadBatch(crafterName, step, math.min(remaining, 64))
+    if loaded == 0 then
+      unloadTurtle(crafterName)
+      return false, err or ("could not load ingredients for " .. displayName(step.output))
+    end
+    rednet.send(crafterId, { type = "craft", times = loaded }, PROTO)
+    local ok = false
+    local deadline = os.clock() + 30
+    while os.clock() < deadline do
+      local senderId, msg = rednet.receive(PROTO, 5)
+      if senderId == crafterId and type(msg) == "table" and msg.type == "done" then
+        ok = msg.ok
+        break
+      end
+    end
+    unloadTurtle(crafterName)
+    if not ok then return false, "crafter failed on " .. displayName(step.output) end
+    remaining = remaining - loaded
+    rescan()
+    report(step, step.times - remaining)
+  end
+  return true
+end
+
+local function craftItem(targetId, count, report)
+  if not db or not planner then return false, "recipe db or planner not loaded" end
+  local crafterId, crafterName = pickCrafter()
+  if not crafterId then return false, "no crafter turtle online" end
+  rescan()
+  local have = {}
+  for id, entry in pairs(index) do have[id] = entry.count end
+  local steps, missingItems = planner.plan(db, have, targetId, count)
+  if not steps then return false, nil, missingItems end
+  for i, step in ipairs(steps) do
+    report(step, 0, i, #steps)
+    local ok, err = executeStep(step, crafterId, crafterName, report)
+    if not ok then return false, err end
+  end
+  return true, #steps
 end
 
 -- ------------------------------------------------------------------ theme/UI
@@ -356,6 +455,15 @@ local function rescanLoop()
   end
 end
 
+local function rosterLoop()
+  while true do
+    local senderId, msg = rednet.receive(PROTO)
+    if type(msg) == "table" and msg.type == "hello" and msg.name then
+      crafters[senderId] = { name = msg.name, seen = os.clock() }
+    end
+  end
+end
+
 local function printStats()
   print(("%-8s %6s %8s %8s %8s"):format("op", "count", "total ms", "avg ms", "max ms"))
   for op, m in pairs(metrics) do
@@ -367,7 +475,7 @@ local function commandLoop()
   print("warehouse v3: " .. controllerName)
   print("delivery: " .. (deliveryName or "NONE FOUND"))
   print("recipes: " .. (db and (db.recipeCount() .. " loaded") or "not deployed"))
-  print("commands: find <text> | get <text> [count] | put | refresh | stats | quit")
+  print("commands: find <text> | get/craft <text> [count] | put | refresh | stats | quit")
   while true do
     write("> ")
     local line = read()
@@ -398,6 +506,43 @@ local function commandLoop()
       if #filtered == 0 then print("no matches") end
       if #filtered > 10 then print("... and " .. (#filtered - 10) .. " more") end
       draw()
+    elseif cmd == "craft" and args[1] then
+      local count = tonumber(args[#args])
+      if count then table.remove(args) else count = 1 end
+      if not db then
+        print("recipe db not loaded")
+      else
+        local hits = db.search(table.concat(args, " "), 20)
+        if #hits == 0 then
+          print("no craftable item matches")
+        else
+          local target = hits[1]
+          print(("crafting %d x %s"):format(count, displayName(target)))
+          local ok, detail, missingItems = craftItem(target, count, function(step, done, i, total)
+            if i then
+              print(("[%d/%d] %s x%d"):format(i, total, displayName(step.output), step.times * step.recipe.count))
+            end
+            status = ("crafting %s (%d/%d)"):format(displayName(step.output), done, step.times)
+            draw()
+          end)
+          if ok then
+            local moved = withdraw(target, count)
+            rescan()
+            draw()
+            print(("done: %d steps, %d delivered to barrel"):format(detail, moved))
+          elseif missingItems then
+            print("missing raw materials:")
+            local shown = 0
+            for mid, amount in pairs(missingItems) do
+              print(("  %d x %s"):format(amount, displayName(mid:gsub("^#", ""))))
+              shown = shown + 1
+              if shown >= 10 then break end
+            end
+          else
+            print("failed: " .. tostring(detail))
+          end
+        end
+      end
     elseif cmd == "get" and args[1] then
       local count = tonumber(args[#args])
       if count then table.remove(args) else count = 64 end
@@ -418,11 +563,11 @@ local function commandLoop()
       applyFilter()
       draw()
     else
-      print("commands: find <text> | get <text> [count] | put | refresh | stats | quit")
+      print("commands: find <text> | get/craft <text> [count] | put | refresh | stats | quit")
     end
   end
 end
 
 rescan()
 draw()
-parallel.waitForAny(rescanLoop, touchLoop, commandLoop)
+parallel.waitForAny(rescanLoop, touchLoop, commandLoop, rosterLoop)
