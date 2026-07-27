@@ -27,3 +27,5 @@ seed_manifest.txt
 transmute.lua
 data/emc.txt
 attract.lua
+music.lua
+pa.lua
