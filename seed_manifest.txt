@@ -1,0 +1,20 @@
+# Paperclip bootstrap seed: the minimum cheap payload to stand up the whole
+# stack elsewhere in one trip. Biased to raw materials - everything
+# grid-craftable (computers, turtles, modems, cables, chests, first machines)
+# rebuilds from these, so we grab cheap bulk, not expensive processed items.
+# id  count   (one inventory = 36 slots; this is ~13)
+minecraft:cobblestone 64
+minecraft:iron_ingot 64
+minecraft:gold_ingot 32
+minecraft:redstone 64
+minecraft:glass 32
+minecraft:oak_planks 64
+minecraft:coal 32
+minecraft:diamond 8
+minecraft:crafting_table 1
+minecraft:furnace 2
+# machine-gated bootstrap: a few so the FIRST Mekanism machine can be built by
+# hand before any machine exists to make more (the control-circuit chicken-egg)
+mekanism:basic_control_circuit 8
+# porting + first delivery inventory
+enderstorage:ender_chest 2

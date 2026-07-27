@@ -22,3 +22,5 @@ bridge.lua
 bridge_commands.lua
 fleet.lua
 harvest.lua
+seed.lua
+seed_manifest.txt
