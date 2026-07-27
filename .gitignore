@@ -1,2 +1,6 @@
 *.bak
 .report.txt
+
+# gradle build output
+datacenter/build/
+datacenter/.gradle/
