@@ -1,6 +1,7 @@
 warehouse.lua
 recipedb.lua
 planner.lua
+plancache.lua
 scheduler.lua
 autopilot.lua
 recipes.lua
