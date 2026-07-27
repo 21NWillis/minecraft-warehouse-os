@@ -81,10 +81,12 @@ end
 
 -- ------------------------------------------------------------------- factory
 local PROTO = "gigafactory"
-local planner
+local planner, schedulerLib
 do
   local ok, mod = pcall(require, "planner")
   if ok then planner = mod end
+  local ok2, mod2 = pcall(require, "scheduler")
+  if ok2 then schedulerLib = mod2 end
 end
 
 local crafters = {}   -- rednet id -> { name = peripheral name, seen = clock }
@@ -92,19 +94,28 @@ for _, side in ipairs(rs.getSides()) do
   if peripheral.getType(side) == "modem" then rednet.open(side) end
 end
 
-local reserved = {}   -- rednet id -> true while a job is loaded on that turtle
-local craftBusy = false
+local reserved = {}   -- rednet id -> true while a batch is loaded on that turtle
+local STALE = 30      -- a crafter is live if its heartbeat is within this many s
+local sched = schedulerLib and schedulerLib.new() or nil
 
+-- passive roster snapshot: pure table scan, no broadcast, no sleep. The old
+-- ping+sleep(1) barrier per round put us far under SOL; heartbeats keep this
+-- fresh for free (crafter.lua beats every few seconds).
 local function idleCrafters()
-  rednet.broadcast({ type = "ping" }, PROTO)
-  sleep(1)
   local idle = {}
   for id, c in pairs(crafters) do
-    if not reserved[id] and os.clock() - c.seen < 60 then
+    if not reserved[id] and (os.clock() - c.seen) < STALE then
       idle[#idle + 1] = { id = id, name = c.name }
     end
   end
   return idle
+end
+
+local function anyCrafters()
+  for _, c in pairs(crafters) do
+    if (os.clock() - c.seen) < STALE then return true end
+  end
+  return false
 end
 
 -- --------------------------------------------------------------------- index
@@ -213,89 +224,146 @@ local function unloadTurtle(crafterName)
   parallel.waitForAll(table.unpack(tasks))
 end
 
--- one job: load a batch on one turtle, craft, wait, unload. writes results[i].
-local function runJob(step, job, results, i)
-  local loaded, err = loadBatch(job.crafter.name, step, job.batch)
+-- dispatch one batch to one turtle: load ingredients, craft, unload.
+-- returns crafted count and an error class ("load" = missing ingredients now,
+-- won't self-resolve; "craft" = transient turtle failure, worth retrying).
+local function dispatchBatch(a)
+  local step = a.step.spec
+  local loaded, err = loadBatch(a.worker.name, step, a.count)
   if loaded == 0 then
-    unloadTurtle(job.crafter.name)
-    results[i] = { crafted = 0, err = err or "could not load ingredients" }
-    return
+    unloadTurtle(a.worker.name)
+    return 0, "load", err
   end
-  rednet.send(job.crafter.id, { type = "craft", times = loaded }, PROTO)
-  local ok = false
-  local deadline = os.clock() + 30
+  rednet.send(a.worker.id, { type = "craft", times = loaded }, PROTO)
+  local ok, deadline = false, os.clock() + 30
   while os.clock() < deadline do
     local senderId, msg = rednet.receive(PROTO, 5)
-    if senderId == job.crafter.id and type(msg) == "table" and msg.type == "done" then
+    if senderId == a.worker.id and type(msg) == "table" and msg.type == "done" then
       ok = msg.ok
       break
     end
   end
-  unloadTurtle(job.crafter.name)
-  results[i] = { crafted = ok and loaded or 0, err = not ok and "craft failed" or nil }
+  unloadTurtle(a.worker.name)
+  return ok and loaded or 0, ok and nil or "craft"
 end
 
--- data-parallel across the turtle roster: a step's batches run simultaneously
-local function executeStep(step, report)
-  local remaining = step.times
-  while remaining > 0 do
+-- the dispatch loop: OWNS all turtle I/O. Event-driven - blocks on
+-- "sched_work" when idle, then drains eligible work in back-to-back rounds
+-- with no artificial sleep. One rescan per round (not per batch). Multiple
+-- craftItem callers submit jobs concurrently; priority decides service order.
+local MAX_STUCK_ROUNDS = 3
+local jobStuck = {}   -- scheduler entry -> consecutive no-progress rounds
+
+local function schedulerLoop()
+  while true do
+    if not (sched and sched:pending()) then
+      os.pullEvent("sched_work")
+    end
     local workers = idleCrafters()
-    if #workers == 0 then return false, "no crafter turtles online" end
-
-    local jobs = {}
-    local pending = remaining
-    for _, worker in ipairs(workers) do
-      if pending <= 0 then break end
-      local batch = math.min(pending, 64)
-      pending = pending - batch
-      reserved[worker.id] = true
-      jobs[#jobs + 1] = { crafter = worker, batch = batch }
+    if #workers == 0 then
+      -- nothing to dispatch to; wait for a heartbeat/roster change rather
+      -- than spin. crafters that come online re-fire sched_work via ping.
+      if anyCrafters() then sleep(1) else os.pullEvent("sched_work") end
+    else
+      local assigns = sched:assign(workers)
+      if #assigns == 0 then
+        sleep(0.2)  -- eligible-but-not-ready (deps); brief yield
+      else
+        for _, a in ipairs(assigns) do
+          reserved[a.worker.id] = true
+        end
+        local results, fns = {}, {}
+        for i, a in ipairs(assigns) do
+          fns[i] = function()
+            local crafted, class, detail = dispatchBatch(a)
+            results[i] = { a = a, crafted = crafted, class = class, detail = detail }
+          end
+        end
+        parallel.waitForAll(table.unpack(fns))
+        for _, r in ipairs(results) do
+          reserved[r.a.worker.id] = nil
+        end
+        rescan()  -- one scan per round: slots moved as turtles pulled
+        -- tally per-job outcomes for this round
+        local progressed, loadFail, sample = {}, {}, {}
+        for _, r in ipairs(results) do
+          local job = r.a.job
+          sample[job] = r.a.step.spec.output
+          if r.crafted > 0 then progressed[job] = true end
+          if r.class == "load" and r.crafted == 0 then
+            loadFail[job] = r.detail or ("missing ingredients for " ..
+              displayName(r.a.step.spec.output))
+          end
+        end
+        -- credit successful/partial batches (load-failures contributed nothing)
+        for _, r in ipairs(results) do
+          if not (r.class == "load" and r.crafted == 0) then
+            sched:complete(r.a, r.crafted)
+          end
+        end
+        -- finish each touched job at most once: hard load-failure, or stuck
+        local seen = {}
+        for _, r in ipairs(results) do
+          local job = r.a.job
+          if not seen[job] then
+            seen[job] = true
+            if loadFail[job] and not progressed[job] then
+              sched:fail(job, loadFail[job]); jobStuck[job.id] = nil
+            elseif progressed[job] then
+              jobStuck[job.id] = 0
+            else
+              jobStuck[job.id] = (jobStuck[job.id] or 0) + 1
+              if jobStuck[job.id] >= MAX_STUCK_ROUNDS then
+                sched:fail(job, "no progress on " .. displayName(sample[job]))
+                jobStuck[job.id] = nil
+              end
+            end
+          end
+        end
+        local snap = sched:snapshot()
+        -- prune stuck-counters for jobs that are no longer live (bounded mem)
+        local live = {}
+        for _, s in ipairs(snap) do live[s.id] = true end
+        for id in pairs(jobStuck) do
+          if not live[id] then jobStuck[id] = nil end
+        end
+        if snap[1] then
+          status = ("craft %s %d/%d  [queue %d]"):format(
+            snap[1].label, snap[1].done, snap[1].total, #snap)
+        end
+        draw()
+      end
     end
-
-    local results = {}
-    local fns = {}
-    for i, job in ipairs(jobs) do
-      fns[i] = function() runJob(step, job, results, i) end
-    end
-    parallel.waitForAll(table.unpack(fns))
-
-    local crafted, firstErr = 0, nil
-    for i, job in ipairs(jobs) do
-      reserved[job.crafter.id] = nil
-      local r = results[i] or {}
-      crafted = crafted + (r.crafted or 0)
-      firstErr = firstErr or r.err
-    end
-    if crafted == 0 then
-      return false, (firstErr or "no progress") .. " on " .. displayName(step.output)
-    end
-    remaining = remaining - crafted
-    rescan()
-    report(step, step.times - remaining)
   end
-  return true
 end
 
-local function craftItem(targetId, count, report)
+-- submit a craft job and block THIS coroutine until it finishes. The scheduler
+-- loop keeps running, so concurrent callers (player command + stock reconcile)
+-- interleave by priority instead of serializing behind a global lock.
+local jobSeq = 0
+local function craftItem(targetId, count, priority, report)
   if not db or not planner then return false, "recipe db or planner not loaded" end
-  if craftBusy then return false, "factory busy - try again shortly" end
-  craftBusy = true
-  local ok, result = pcall(function()
-    rescan()
-    local have = {}
-    for id, entry in pairs(index) do have[id] = entry.count end
-    local steps, missingItems = planner.plan(db, have, targetId, count)
-    if not steps then return { false, nil, missingItems } end
-    for i, step in ipairs(steps) do
-      report(step, 0, i, #steps)
-      local stepOk, err = executeStep(step, report)
-      if not stepOk then return { false, err } end
-    end
-    return { true, #steps }
-  end)
-  craftBusy = false
-  if not ok then return false, "internal error: " .. tostring(result) end
-  return result[1], result[2], result[3]
+  if not sched then return false, "scheduler not loaded" end
+  rescan()
+  local have = {}
+  for id, entry in pairs(index) do have[id] = entry.count end
+  local steps, missingItems = planner.plan(db, have, targetId, count)
+  if not steps then return false, nil, missingItems end
+
+  jobSeq = jobSeq + 1
+  local evt = "craftdone_" .. jobSeq
+  local jobId = targetId .. "#" .. jobSeq
+  sched:submit({
+    id = jobId, priority = priority or 0, steps = steps,
+    label = displayName(targetId),
+    onDone = function(ok, reason) os.queueEvent(evt, ok, reason) end,
+  })
+  os.queueEvent("sched_work")
+  rednet.broadcast({ type = "ping" }, PROTO)  -- warm roster once, not per round
+  -- progress is rendered by schedulerLoop from sched:snapshot(); the caller's
+  -- report closure (if any) is retained only for API compatibility.
+  local _, ok, reason = os.pullEvent(evt)
+  return ok, ok and #steps or reason
 end
 
 -- ------------------------------------------------------------------ theme/UI
@@ -624,7 +692,7 @@ local function gridLoop()
         msg = "cancelled"
         return
       end
-      local ok, detail, missingItems = craftItem(id, n, function(step, done, i, total)
+      local ok, detail, missingItems = craftItem(id, n, 0, function(step, done, i, total)
         statusLine((" crafting %s (%s)"):format(displayName(step.output),
           i and (i .. "/" .. total) or tostring(done)))
       end)
@@ -683,7 +751,11 @@ local function rosterLoop()
   while true do
     local senderId, msg = rednet.receive(PROTO)
     if type(msg) == "table" and msg.type == "hello" and msg.name then
+      local fresh = not crafters[senderId]
       crafters[senderId] = { name = msg.name, seen = os.clock() }
+      -- a newly-online turtle may unblock a dispatch loop that stalled for
+      -- lack of workers; nudge it (cheap, only on first sighting)
+      if fresh then os.queueEvent("sched_work") end
     end
   end
 end
@@ -718,12 +790,13 @@ end
 local function stockLoop()
   sleep(30)
   while true do
-    if db and planner and not craftBusy then
+    if db and planner then
       for id, target in pairs(stockTargets) do
         local haveCount = index[id] and index[id].count or 0
         if haveCount < target then
           local wanted = target - haveCount
-          local ok, detail, missingItems = craftItem(id, wanted, function(step, done, i, total)
+          -- priority 10: background reconcile yields to player requests (p0)
+          local ok, detail, missingItems = craftItem(id, wanted, 10, function(step, done, i, total)
             status = ("stock: %s (%s)"):format(displayName(step.output),
               i and (i .. "/" .. total) or tostring(done))
             draw()
@@ -856,11 +929,8 @@ local function commandLoop()
         else
           local target = hits[1]
           print(("crafting %d x %s"):format(count, displayName(target)))
-          local ok, detail, missingItems = craftItem(target, count, function(step, done, i, total)
-            if i then
-              print(("[%d/%d] %s x%d"):format(i, total, displayName(step.output), step.times * step.recipe.count))
-            end
-            status = ("crafting %s (%d/%d)"):format(displayName(step.output), done, step.times)
+          local ok, detail, missingItems = craftItem(target, count, 0, function(step, done, i, total)
+            status = ("crafting %s"):format(displayName(step.output))
             draw()
           end)
           if ok then
@@ -909,4 +979,4 @@ end
 rescan()
 loadStock()
 draw()
-parallel.waitForAny(rescanLoop, touchLoop, commandLoop, rosterLoop, stockLoop)
+parallel.waitForAny(rescanLoop, touchLoop, commandLoop, rosterLoop, stockLoop, schedulerLoop)

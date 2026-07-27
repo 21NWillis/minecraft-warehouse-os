@@ -28,12 +28,13 @@ end
 
 hello()
 local lastHello = os.clock()
+local HEARTBEAT = 5   -- keep the warehouse roster fresh without spamming
 while true do
-  if os.clock() - lastHello > 15 then
+  if os.clock() - lastHello > HEARTBEAT then
     hello()
     lastHello = os.clock()
   end
-  local senderId, msg = rednet.receive(PROTO, 15)
+  local senderId, msg = rednet.receive(PROTO, HEARTBEAT)
   if senderId and type(msg) == "table" then
     if msg.type == "ping" then
       hello()
