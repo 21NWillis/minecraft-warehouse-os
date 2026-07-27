@@ -32,3 +32,4 @@ pa.lua
 exchange.lua
 melink.lua
 conway.lua
+remote.lua
