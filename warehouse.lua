@@ -81,12 +81,39 @@ end
 
 -- ------------------------------------------------------------------- factory
 local PROTO = "gigafactory"
-local planner, schedulerLib
+local planner, schedulerLib, pc
 do
   local ok, mod = pcall(require, "planner")
   if ok then planner = mod end
   local ok2, mod2 = pcall(require, "scheduler")
   if ok2 then schedulerLib = mod2 end
+  -- cost-aware cached planner (RadixAttention DAG + EMC); planner is the fallback
+  local ok3, pcmod = pcall(require, "plancache")
+  if ok3 and db then
+    local emcMap, any = {}, false
+    if fs.exists("data/emc.txt") then
+      local f = fs.open("data/emc.txt", "r")
+      while true do
+        local l = f.readLine(); if not l then break end
+        local id, v = l:match("^(%S+)%s+([%d%.]+)$")
+        if id then emcMap[id] = tonumber(v); any = true end
+      end
+      f.close()
+    end
+    pc = pcmod.new(db, any and emcMap or nil)
+  end
+end
+
+-- plan a craft: prefer the cached cost-aware plancache, fall back to the
+-- backtracking planner if it's unavailable or errors at runtime. Both return
+-- (steps, missing, stats) with a compatible step format.
+local function planCraft(have, targetId, count)
+  if pc then
+    local copy = {}; for k, v in pairs(have) do copy[k] = v end
+    local ok, steps, missing, stats = pcall(function() return pc:plan(targetId, count, copy) end)
+    if ok then return steps, missing, stats end
+  end
+  return planner.plan(db, have, targetId, count)
 end
 
 local crafters = {}   -- rednet id -> { name = peripheral name, seen = clock }
@@ -363,7 +390,7 @@ local function craftItem(targetId, count, priority, report)
   rescan()
   local have = {}
   for id, entry in pairs(index) do have[id] = entry.count end
-  local steps, missingItems, pstats = planner.plan(db, have, targetId, count)
+  local steps, missingItems, pstats = planCraft(have, targetId, count)
   if not steps then return false, nil, missingItems end
   if pstats then
     serve.cacheHit = serve.cacheHit + pstats.served
