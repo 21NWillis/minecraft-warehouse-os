@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "PGP",
+    "RBR",
+    "PGP"
+  ],
+  "key": {
+    "P": {
+      "item": "minecraft:glass_pane"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "B": {
+      "item": "minecraft:redstone_block"
+    }
+  },
+  "result": {
+    "id": "datacenter:gpu_gt1",
+    "count": 1
+  }
+}

@@ -15,5 +15,5 @@ Daemon will be stopped at the end of the build
 > Task :check UP-TO-DATE
 > Task :build
 
-BUILD SUCCESSFUL in 23s
+BUILD SUCCESSFUL in 18s
 5 actionable tasks: 3 executed, 2 up-to-date

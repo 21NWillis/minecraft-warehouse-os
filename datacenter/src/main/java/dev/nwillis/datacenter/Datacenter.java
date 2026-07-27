@@ -37,6 +37,32 @@ public final class Datacenter {
         BLOCK_ENTITIES.register("datacenter_terminal",
             () -> BlockEntityType.Builder.of(DatacenterTerminalBlockEntity::new, TERMINAL.get()).build(null));
 
+    // --- GPU compute peripherals (three tiers) + the unobtanium gate ---------
+    private static DeferredHolder<Block, GpuBlock> gpu(String name, GpuTier tier) {
+        return BLOCKS.register(name,
+            () -> new GpuBlock(BlockBehaviour.Properties.of().strength(3.0f), tier));
+    }
+
+    public static final DeferredHolder<Block, GpuBlock> GPU_GT1 = gpu("gpu_gt1", GpuTier.GT1);
+    public static final DeferredHolder<Block, GpuBlock> GPU_RTX4 = gpu("gpu_rtx4", GpuTier.RTX4);
+    public static final DeferredHolder<Block, GpuBlock> GPU_B800 = gpu("gpu_b800", GpuTier.B800);
+
+    public static final DeferredHolder<Item, BlockItem> GPU_GT1_ITEM =
+        ITEMS.register("gpu_gt1", () -> new BlockItem(GPU_GT1.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> GPU_RTX4_ITEM =
+        ITEMS.register("gpu_rtx4", () -> new BlockItem(GPU_RTX4.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> GPU_B800_ITEM =
+        ITEMS.register("gpu_b800", () -> new BlockItem(GPU_B800.get(), new Item.Properties()));
+
+    public static final DeferredHolder<Item, Item> UNOBTANIUM =
+        ITEMS.register("unobtanium", () -> new Item(new Item.Properties().fireResistant()));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GpuBlockEntity>> GPU_BE =
+        BLOCK_ENTITIES.register("gpu", () -> BlockEntityType.Builder.of(
+            (pos, state) -> new GpuBlockEntity(pos, state,
+                ((GpuBlock) state.getBlock()).tier()),
+            GPU_GT1.get(), GPU_RTX4.get(), GPU_B800.get()).build(null));
+
     public Datacenter(IEventBus modBus) {
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
@@ -50,11 +76,19 @@ public final class Datacenter {
             (be, side) -> be.getItemHandler());
         event.registerBlockEntity(PeripheralCapability.get(), TERMINAL_BE.get(),
             (be, side) -> be.getPeripheral());
+        event.registerBlockEntity(PeripheralCapability.get(), GPU_BE.get(),
+            (be, side) -> be.getPeripheral());
     }
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(TERMINAL_ITEM.get());
+            event.accept(GPU_GT1_ITEM.get());
+            event.accept(GPU_RTX4_ITEM.get());
+            event.accept(GPU_B800_ITEM.get());
+        }
+        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+            event.accept(UNOBTANIUM.get());
         }
     }
 }

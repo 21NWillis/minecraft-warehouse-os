@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "datacenter:block/gpu_b800"
+    }
+  }
+}

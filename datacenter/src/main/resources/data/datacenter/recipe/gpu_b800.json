@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "UNU",
+    "RCR",
+    "UNU"
+  ],
+  "key": {
+    "U": {
+      "item": "datacenter:unobtanium"
+    },
+    "N": {
+      "item": "minecraft:netherite_block"
+    },
+    "R": {
+      "item": "datacenter:gpu_rtx4"
+    },
+    "C": {
+      "item": "minecraft:nether_star"
+    }
+  },
+  "result": {
+    "id": "datacenter:gpu_b800",
+    "count": 1
+  }
+}
