@@ -692,6 +692,7 @@ end
 local STOCK_FILE = "stock.cfg"
 local STOCK_INTERVAL = 60
 local stockTargets = {}   -- item id -> target count
+local stockStatusById = {} -- item id -> last reconcile note ("ok" / reason)
 
 local function loadStock()
   stockTargets = {}
@@ -722,16 +723,25 @@ local function stockLoop()
         local haveCount = index[id] and index[id].count or 0
         if haveCount < target then
           local wanted = target - haveCount
-          local ok = craftItem(id, wanted, function(step, done, i, total)
+          local ok, detail, missingItems = craftItem(id, wanted, function(step, done, i, total)
             status = ("stock: %s (%s)"):format(displayName(step.output),
               i and (i .. "/" .. total) or tostring(done))
             draw()
           end)
           if ok then
+            stockStatusById[id] = "ok"
             status = ("stocked %d x %s"):format(wanted, displayName(id))
+          elseif missingItems then
+            local mid, amount = next(missingItems)
+            stockStatusById[id] = ("need %d %s"):format(amount or 0,
+              displayName((mid or "?"):gsub("^#", "")))
+          else
+            stockStatusById[id] = detail or "blocked"
           end
           draw()
           break  -- one target per cycle; keep the factory polite
+        else
+          stockStatusById[id] = "ok"
         end
       end
     end
@@ -796,7 +806,12 @@ local function commandLoop()
         local n = 0
         for id, target in pairs(stockTargets) do
           local haveCount = index[id] and index[id].count or 0
-          print(("%6d / %-6d %s"):format(haveCount, target, displayName(id)))
+          local note = stockStatusById[id]
+          local flag = ""
+          if haveCount >= target then flag = "ok"
+          elseif note and note ~= "ok" then flag = note end
+          print(("%6d / %-6d %-18s %s"):format(haveCount, target,
+            displayName(id):sub(1, 18), flag))
           n = n + 1
         end
         if n == 0 then print("no stock targets - stock add <item> <count>") end
