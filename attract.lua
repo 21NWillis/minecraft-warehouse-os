@@ -61,7 +61,6 @@ local function stats()
 end
 
 monitor.setTextScale(0.5)
-for c, rgb in pairs(THEME) do pcall(monitor.setPaletteColour, monitor, c, rgb) end
 for c, rgb in pairs(THEME) do pcall(monitor.setPaletteColour, c, rgb) end
 local w, h = monitor.getSize()
 
