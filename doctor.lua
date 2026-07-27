@@ -81,13 +81,18 @@ else w("no modem (no networking / crafter pool / mesh)") end
 -- recipe DB
 line("")
 local haveRecipes = fs.exists("data/recipes.txt")
-local haveEmc = fs.exists("data/emc.txt")
 local baseUrl = fs.exists(".updatebase")
 if haveRecipes then ok("data/recipes.txt on disk")
 elseif baseUrl then w("no local recipe DB - will stream from GitHub at load (ok if online)")
 else bad("no recipe DB and no update base url (run `update <url>`)") end
-if haveEmc or baseUrl then ok("EMC data available (transmute/exchange/cost-planner ok)")
-else w("no data/emc.txt (economy tools degrade)") end
+-- EMC streams into RAM (too big for the 1MB disk); actually load it to check
+local okE, emcload = pcall(require, "emcload")
+if okE then
+  local emc = emcload.load()
+  local ne = 0; for _ in pairs(emc) do ne = ne + 1 end
+  if ne > 0 then ok(("EMC data loads (%d items priced%s)"):format(ne, haveRecipes and ", disk" or ", streamed"))
+  else w("EMC data empty (transmute/exchange/cost-planner degrade)") end
+else w("emcload.lua not deployed") end
 
 -- try loading the DB
 local okDb, db = pcall(require, "recipedb")

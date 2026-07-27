@@ -63,16 +63,10 @@ else
   print("[WARN] recipedb not loaded - crafting features unavailable")
 end
 
--- EMC functional check
-if fs.exists("data/emc.txt") then
-  local f = fs.open("data/emc.txt", "r"); local any = false
-  while true do local l = f.readLine(); if not l then break end
-    if l:find("iron_ingot") then any = true end end
-  f.close()
-  if any then ok("EMC data present and parseable") else print("[WARN] EMC data has no iron_ingot?") end
-else
-  print("[WARN] no EMC data (economy tools degrade)")
-end
+-- EMC functional check (streams into RAM if not on disk)
+local okE, emcload = pcall(require, "emcload")
+if okE and next(emcload.load()) then ok("EMC data loads (disk or streamed)")
+else print("[WARN] no EMC data (economy tools degrade)") end
 
 print(("\n== %d OK, %d FAIL =="):format(pass, fail))
 if fail == 0 then print("functional checks passed - the warehouse should work.")
