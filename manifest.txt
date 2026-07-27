@@ -31,3 +31,4 @@ music.lua
 pa.lua
 exchange.lua
 melink.lua
+conway.lua
