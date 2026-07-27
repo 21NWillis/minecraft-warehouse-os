@@ -24,9 +24,16 @@ public final class ClusterState extends SavedData {
     static final int MAX_KEYS = 4096;
     static final int MAX_VALUE_LENGTH = 16 * 1024;
     static final int MAX_QUEUE_LENGTH = 4096;
+    /** Hard budget for everything combined - keeps the world save honest. */
+    static final long MAX_TOTAL_BYTES = 4L * 1024 * 1024;
 
     private final Map<String, String> store = new HashMap<>();
     private final Map<String, Deque<String>> queues = new HashMap<>();
+    private long totalBytes = 0;
+
+    private boolean fits(long delta) {
+        return totalBytes + delta <= MAX_TOTAL_BYTES;
+    }
 
     public static ClusterState get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(
@@ -38,12 +45,14 @@ public final class ClusterState extends SavedData {
         CompoundTag kv = tag.getCompound("kv");
         for (String key : kv.getAllKeys()) {
             state.store.put(key, kv.getString(key));
+            state.totalBytes += key.length() + kv.getString(key).length();
         }
         CompoundTag qs = tag.getCompound("queues");
         for (String name : qs.getAllKeys()) {
             Deque<String> queue = new ArrayDeque<>();
             for (Tag item : qs.getList(name, Tag.TAG_STRING)) {
                 queue.addLast(item.getAsString());
+                state.totalBytes += item.getAsString().length();
             }
             state.queues.put(name, queue);
         }
@@ -71,14 +80,22 @@ public final class ClusterState extends SavedData {
 
     public boolean kvSet(String key, String value) {
         if (value.length() > MAX_VALUE_LENGTH) return false;
-        if (!store.containsKey(key) && store.size() >= MAX_KEYS) return false;
+        String previous = store.get(key);
+        if (previous == null && store.size() >= MAX_KEYS) return false;
+        long delta = value.length() + (previous == null ? key.length() : -previous.length());
+        if (!fits(delta)) return false;
         store.put(key, value);
+        totalBytes += delta;
         setDirty();
         return true;
     }
 
     public void kvDelete(String key) {
-        if (store.remove(key) != null) setDirty();
+        String previous = store.remove(key);
+        if (previous != null) {
+            totalBytes -= key.length() + previous.length();
+            setDirty();
+        }
     }
 
     public long kvIncrement(String key, long delta) {
@@ -89,8 +106,7 @@ public final class ClusterState extends SavedData {
             current = 0;
         }
         long next = current + delta;
-        store.put(key, Long.toString(next));
-        setDirty();
+        kvSet(key, Long.toString(next));
         return next;
     }
 
@@ -103,10 +119,11 @@ public final class ClusterState extends SavedData {
     }
 
     public boolean queuePush(String name, String value) {
-        if (value.length() > MAX_VALUE_LENGTH) return false;
+        if (value.length() > MAX_VALUE_LENGTH || !fits(value.length())) return false;
         Deque<String> queue = queues.computeIfAbsent(name, k -> new ArrayDeque<>());
         if (queue.size() >= MAX_QUEUE_LENGTH) return false;
         queue.addLast(value);
+        totalBytes += value.length();
         setDirty();
         return true;
     }
@@ -114,8 +131,10 @@ public final class ClusterState extends SavedData {
     public String queuePop(String name) {
         Deque<String> queue = queues.get(name);
         if (queue == null || queue.isEmpty()) return null;
+        String value = queue.pollFirst();
+        totalBytes -= value.length();
         setDirty();
-        return queue.pollFirst();
+        return value;
     }
 
     public int queueSize(String name) {
