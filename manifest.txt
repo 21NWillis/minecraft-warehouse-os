@@ -39,3 +39,4 @@ machine.lua
 menu.lua
 marquee.lua
 doctor.lua
+selftest.lua
