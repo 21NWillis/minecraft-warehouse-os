@@ -18,3 +18,5 @@ sableprobe.lua
 schematic.lua
 builder.lua
 buildrun.lua
+bridge.lua
+bridge_commands.lua

@@ -601,10 +601,32 @@ local function touchLoop()
   end
 end
 
+-- write a small state file so the bridge can surface serve metrics to Claude
+local function dumpState()
+  local ok, f = pcall(fs.open, "wh_state.txt", "w")
+  if not ok or not f then return end
+  local elapsedMin = math.max(1 / 60, (os.epoch("utc") - serve.since) / 60000)
+  local cacheTotal = serve.cacheHit + serve.cacheMiss
+  f.write(("jobs: %d ok / %d fail\n"):format(serve.jobsOk, serve.jobsFail))
+  f.write(("throughput: %.1f items/min\n"):format(serve.itemsOut / elapsedMin))
+  f.write(("queue peak: %d\n"):format(serve.peakQueue))
+  f.write(("cache hit rate: %.1f%% (%d/%d)\n"):format(
+    cacheTotal > 0 and 100 * serve.cacheHit / cacheTotal or 0, serve.cacheHit, cacheTotal))
+  local nstock = 0
+  for id, tgt in pairs(stockTargets) do
+    local hv = index[id] and index[id].count or 0
+    f.write(("stock %s: %d/%d %s\n"):format(displayName(id), hv, tgt, stockStatusById[id] or ""))
+    nstock = nstock + 1
+  end
+  if nstock == 0 then f.write("stock: no targets\n") end
+  f.close()
+end
+
 local function rescanLoop()
   while true do
     rescan()
     draw()
+    dumpState()
     sleep(RESCAN_SECONDS)
   end
 end
