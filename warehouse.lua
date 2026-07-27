@@ -353,6 +353,8 @@ local jobSeq = 0
 local function craftItem(targetId, count, priority, report)
   if not db or not planner then return false, "recipe db or planner not loaded" end
   if not sched then return false, "scheduler not loaded" end
+  local admitOk, why = sched:admit(priority or 0)
+  if not admitOk then return false, why end
   rescan()
   local have = {}
   for id, entry in pairs(index) do have[id] = entry.count end

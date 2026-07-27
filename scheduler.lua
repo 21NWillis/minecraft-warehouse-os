@@ -22,8 +22,34 @@ scheduler.__index = scheduler
 
 local BATCH = 64
 
-function scheduler.new()
-  return setmetatable({ jobs = {}, seq = 0 }, scheduler)
+-- opts.softCap: background (low-priority) work is shed above this queue depth.
+-- opts.hardCap: nothing is admitted above this (protects the main thread).
+function scheduler.new(opts)
+  opts = opts or {}
+  return setmetatable({
+    jobs = {}, seq = 0,
+    softCap = opts.softCap or 16,
+    hardCap = opts.hardCap or 64,
+  }, scheduler)
+end
+
+function scheduler:load()
+  return #self.jobs
+end
+
+-- admission control: decide BEFORE planning/submitting a job. Player requests
+-- (priority 0) are admitted up to hardCap; background reconcile (priority>=10)
+-- is shed above softCap so a big restock can't starve interactive requests or
+-- pile unbounded work on the shared main thread. Load-shedding by priority.
+function scheduler:admit(priority)
+  local n = #self.jobs
+  if n >= self.hardCap then
+    return false, "queue full (" .. n .. "/" .. self.hardCap .. ")"
+  end
+  if (priority or 0) >= 10 and n >= self.softCap then
+    return false, "factory busy, deferring background work (queue " .. n .. ")"
+  end
+  return true
 end
 
 -- steps: ordered list from planner; each { output, recipe, times, picks }

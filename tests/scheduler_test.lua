@@ -123,5 +123,19 @@ do
   check("scheduler empty after completion", not s:pending())
 end
 
+-- 7. admission control / backpressure: background work shed above softCap,
+--    player work still admitted up to hardCap
+do
+  local s = scheduler.new({ softCap = 2, hardCap = 4 })
+  local function fill(n) for i = 1, n do s:submit({ id = "j" .. i, priority = 5, steps = { step("x", 1) } }) end end
+  check("admits when empty (player)", (s:admit(0)))
+  check("admits when empty (background)", (s:admit(10)))
+  fill(2)  -- queue depth 2 == softCap
+  check("sheds background at softCap", not (s:admit(10)))
+  check("still admits player below hardCap", (s:admit(0)))
+  fill(2)  -- queue depth 4 == hardCap
+  check("rejects everything at hardCap", not (s:admit(0)))
+end
+
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
