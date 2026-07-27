@@ -455,6 +455,168 @@ local function rescanLoop()
   end
 end
 
+-- ----------------------------------------------------------------- grid mode
+-- RS/AE2-style interactive terminal: live search, scroll, click to withdraw
+local function gridSearchList(q)
+  local list = {}
+  local ql = q:lower()
+  for _, id in ipairs(sorted) do
+    if q == "" or id:gsub("^[^:]+:", ""):find(ql, 1, true)
+      or displayName(id):lower():find(ql, 1, true) then
+      list[#list + 1] = id
+    end
+  end
+  if db and q ~= "" then
+    local seen = {}
+    for _, id in ipairs(list) do seen[id] = true end
+    for _, id in ipairs(db.search(q, 30)) do
+      if not seen[id] then list[#list + 1] = id end
+    end
+  end
+  return list
+end
+
+local function gridLoop()
+  local q, sel, top = "", 1, 1
+  local msg = "type=search  click/enter=64  rclick=1  TAB=craft  DEL=exit"
+  applyTheme(term)
+  local timer = os.startTimer(5)
+
+  local function statusLine(text)
+    local w, h = term.getSize()
+    term.setCursorPos(1, h)
+    term.setBackgroundColor(colors.gray)
+    term.clearLine()
+    term.setTextColor(colors.lightGray)
+    term.write(text:sub(1, w))
+    term.setBackgroundColor(colors.black)
+  end
+
+  while true do
+    local w, h = term.getSize()
+    local rows = h - 2
+    local list = gridSearchList(q)
+    if sel > #list then sel = math.max(1, #list) end
+    if sel < top then top = sel end
+    if sel > top + rows - 1 then top = sel - rows + 1 end
+
+    term.setCursorPos(1, 1)
+    term.setBackgroundColor(colors.gray)
+    term.clearLine()
+    term.setTextColor(colors.cyan)
+    term.write(" search: ")
+    term.setTextColor(colors.white)
+    term.write(q)
+    term.setTextColor(colors.lightGray)
+    term.write("_")
+    for i = 1, rows do
+      term.setCursorPos(1, i + 1)
+      local id = list[top + i - 1]
+      if id then
+        local entry = index[id]
+        local count = entry and entry.count or 0
+        term.setBackgroundColor((top + i - 1) == sel and colors.blue or colors.black)
+        term.clearLine()
+        term.setTextColor(count > 0 and colors.cyan or colors.orange)
+        term.write((" %6s "):format(count > 0 and fmt(count) or "craft"))
+        term.setTextColor(colors.white)
+        term.write(displayName(id):sub(1, w - 11))
+        if db and db.isCraftable(id) then
+          term.setTextColor(colors.green)
+          term.write(" +")
+        end
+      else
+        term.setBackgroundColor(colors.black)
+        term.clearLine()
+      end
+    end
+    statusLine(msg)
+
+    local function takeRow(rowIdx, amount)
+      local id = list[rowIdx]
+      if not id then return end
+      local entry = index[id]
+      if entry and entry.count > 0 then
+        local moved = withdraw(id, math.min(amount, entry.count))
+        rescan()
+        msg = ("took %d x %s -> barrel"):format(moved, displayName(id))
+      elseif db and db.isCraftable(id) then
+        msg = "not in stock - TAB to craft it"
+      end
+    end
+
+    local function craftRow(rowIdx)
+      local id = list[rowIdx]
+      if not (id and db and db.isCraftable(id)) then
+        msg = "not craftable"
+        return
+      end
+      statusLine(" craft how many " .. displayName(id) .. "? ")
+      term.setCursorPos(1, select(2, term.getSize()))
+      term.setBackgroundColor(colors.gray)
+      term.setTextColor(colors.white)
+      write(" craft how many " .. displayName(id) .. "? ")
+      local n = tonumber(read())
+      term.setBackgroundColor(colors.black)
+      if not n or n < 1 then
+        msg = "cancelled"
+        return
+      end
+      local ok, detail, missingItems = craftItem(id, n, function(step, done, i, total)
+        statusLine((" crafting %s (%s)"):format(displayName(step.output),
+          i and (i .. "/" .. total) or tostring(done)))
+      end)
+      if ok then
+        local moved = withdraw(id, n)
+        rescan()
+        msg = ("crafted %d x %s -> barrel"):format(moved, displayName(id))
+      elseif missingItems then
+        local firstId, firstAmount = next(missingItems)
+        msg = ("missing materials e.g. %d x %s"):format(firstAmount or 0,
+          displayName((firstId or "?"):gsub("^#", "")))
+      else
+        msg = "craft failed: " .. tostring(detail)
+      end
+    end
+
+    local ev = { os.pullEvent() }
+    local e = ev[1]
+    if e == "char" then
+      q = q .. ev[2]
+      sel = 1
+    elseif e == "key" then
+      local k = ev[2]
+      if k == keys.backspace then
+        q = q:sub(1, -2)
+        sel = 1
+      elseif k == keys.up then sel = math.max(1, sel - 1)
+      elseif k == keys.down then sel = sel + 1
+      elseif k == keys.pageUp then sel = math.max(1, sel - rows)
+      elseif k == keys.pageDown then sel = sel + rows
+      elseif k == keys.enter then takeRow(sel, 64)
+      elseif k == keys.tab then craftRow(sel)
+      elseif k == keys.delete then break
+      end
+    elseif e == "mouse_scroll" then
+      sel = math.max(1, sel + ev[2] * 3)
+    elseif e == "mouse_click" then
+      local btn, _, y = ev[2], ev[3], ev[4]
+      if y >= 2 and y <= h - 1 then
+        local rowIdx = top + (y - 2)
+        if list[rowIdx] then
+          sel = rowIdx
+          takeRow(rowIdx, btn == 1 and 64 or 1)
+        end
+      end
+    elseif e == "timer" and ev[2] == timer then
+      timer = os.startTimer(5)
+    end
+  end
+  term.setBackgroundColor(colors.black)
+  term.clear()
+  term.setCursorPos(1, 1)
+end
+
 local function rosterLoop()
   while true do
     local senderId, msg = rednet.receive(PROTO)
@@ -472,9 +634,11 @@ local function printStats()
 end
 
 local function commandLoop()
+  gridLoop()
   print("warehouse v3: " .. controllerName)
   print("delivery: " .. (deliveryName or "NONE FOUND"))
   print("recipes: " .. (db and (db.recipeCount() .. " loaded") or "not deployed"))
+  print("'grid' reopens the item grid")
   print("commands: find <text> | get/craft <text> [count] | put | refresh | stats | quit")
   while true do
     write("> ")
@@ -485,6 +649,9 @@ local function commandLoop()
 
     if cmd == "quit" then
       return
+    elseif cmd == "grid" then
+      gridLoop()
+      print("back to console - 'grid' to reopen")
     elseif cmd == "stats" then
       printStats()
     elseif cmd == "refresh" then
