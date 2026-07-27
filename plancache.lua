@@ -20,14 +20,19 @@
 local plancache = {}
 plancache.__index = plancache
 
-function plancache.new(db)
+-- emc (optional): item -> intrinsic value from tools/emc.py. When supplied,
+-- resolution picks the CHEAPEST resolvable recipe (min total ingredient EMC)
+-- instead of the first - cost-optimal crafting, cached like everything else.
+function plancache.new(db, emc)
   return setmetatable({
-    db = db,
+    db = db, emc = emc,
     nodes = {},          -- item -> resolved node (the shared DAG / cache)
     resolving = {},      -- item -> true while on the DFS stack (cycle color)
     hits = 0, misses = 0,
   }, plancache)
 end
+
+local EMC_DEFAULT = 1000   -- unpriced ingredient: usable but deprioritized
 
 -- does some concrete option of this ingredient token resolve to obtainable?
 local function tokenOptions(self, token)
@@ -37,6 +42,25 @@ local function tokenOptions(self, token)
     return self.db.options(token)          -- alternatives
   end
   return { token }
+end
+
+-- cheapest EMC among a token's concrete options (tags/alts -> min)
+function plancache:tokenEmc(token)
+  local best = math.huge
+  for _, o in ipairs(tokenOptions(self, token)) do
+    local v = (self.emc and self.emc[o]) or EMC_DEFAULT
+    if v < best then best = v end
+  end
+  return best == math.huge and EMC_DEFAULT or best
+end
+
+-- intrinsic cost of one craft of a recipe: sum of ingredient EMC over yield
+function plancache:recipeCost(recipe)
+  local total = 0
+  for _, token in pairs(recipe.grid) do
+    total = total + self:tokenEmc(token)
+  end
+  return total / (recipe.count or 1)
 end
 
 -- Resolve an item to a cached node (stock-independent). A node is:
@@ -75,7 +99,13 @@ function plancache:resolve(item)
       end
       if not anyResolvable then ok = false; break end
     end
-    if ok then chosen = r; break end
+    if ok then
+      if not self.emc then chosen = r; break end     -- no cost model: first wins
+      -- cost model: keep the cheapest resolvable recipe (min total EMC / yield)
+      if not chosen or self:recipeCost(r) < self:recipeCost(chosen) then
+        chosen = r
+      end
+    end
   end
   self.resolving[item] = nil
 

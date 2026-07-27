@@ -97,5 +97,41 @@ do
     stats.resolved, stats.hits, stats.misses))
 end
 
+-- EMC-aware resolution: given two recipes for the same item, pick the cheaper
+-- one by intrinsic value. Uses a tiny mock db so the choice is unambiguous.
+do
+  local mockDb = {
+    recipes = {
+      ["mod:widget"] = {
+        -- expensive: 1 diamond ; cheap: 4 iron. widget count 1 each.
+        { count = 1, grid = { [1] = "mod:diamond" } },
+        { count = 1, grid = { [1] = "mod:iron", [2] = "mod:iron", [3] = "mod:iron", [4] = "mod:iron" } },
+      },
+    },
+    recipesFor = function(self, id) return self.recipes[id] or {} end,
+    options = function(self, tok) return { tok } end,
+    isCraftable = function(self, id) return self.recipes[id] ~= nil end,
+  }
+  -- recipedb-style call convention is db.recipesFor(id); adapt with closures
+  local db2 = {
+    recipesFor = function(id) return mockDb.recipes[id] or {} end,
+    options = function(tok) return { tok } end,
+    isCraftable = function(id) return mockDb.recipes[id] ~= nil end,
+  }
+  local emc = { ["mod:diamond"] = 8192, ["mod:iron"] = 256 }  -- 1 dia=8192 vs 4 iron=1024
+  local pc = plancache.new(db2, emc)
+  local node = pc:resolve("mod:widget")
+  check("EMC-aware: picks the cheaper recipe (4 iron < 1 diamond)",
+    node.resolvable and node.recipe and node.recipe.grid[1] == "mod:iron",
+    node.recipe and node.recipe.grid[1] or "nil")
+
+  -- without an emc model, resolution keeps the first recipe (diamond)
+  local pc2 = plancache.new(db2)
+  local node2 = pc2:resolve("mod:widget")
+  check("no cost model: keeps first recipe (diamond)",
+    node2.recipe and node2.recipe.grid[1] == "mod:diamond",
+    node2.recipe and node2.recipe.grid[1] or "nil")
+end
+
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
