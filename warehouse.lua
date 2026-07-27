@@ -15,15 +15,16 @@ if runArgs[1] == "install" then
 end
 
 local CONTROLLER_MATCH = "controller"
-local DELIVERY_MATCH = { "minecraft:chest", "minecraft:barrel" }
+-- first match wins: ender chest channel beats local chest/barrel
+local DELIVERY_MATCH = { "enderstorage", "minecraft:chest", "minecraft:barrel" }
 local RESCAN_SECONDS = 10
 local TAP_AMOUNT = 64
 
 -- ---------------------------------------------------------------- peripherals
 local function findPeripheral(matches)
   if type(matches) == "string" then matches = { matches } end
-  for _, name in ipairs(peripheral.getNames()) do
-    for _, m in ipairs(matches) do
+  for _, m in ipairs(matches) do
+    for _, name in ipairs(peripheral.getNames()) do
       if name:find(m, 1, true) then return name end
     end
   end
@@ -654,6 +655,15 @@ local function commandLoop()
       print("back to console - 'grid' to reopen")
     elseif cmd == "stats" then
       printStats()
+    elseif cmd == "crafters" then
+      rednet.broadcast({ type = "ping" }, PROTO)
+      sleep(1.5)
+      local found = 0
+      for id, c in pairs(crafters) do
+        print(("  #%d %s (seen %ds ago)"):format(id, c.name, os.clock() - c.seen))
+        found = found + 1
+      end
+      if found == 0 then print("no crafter turtles responding") end
     elseif cmd == "refresh" then
       rescan()
       draw()
