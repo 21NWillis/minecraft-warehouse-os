@@ -2,6 +2,7 @@ warehouse.lua
 recipedb.lua
 planner.lua
 scheduler.lua
+autopilot.lua
 recipes.lua
 report.lua
 probe.lua
