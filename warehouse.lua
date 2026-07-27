@@ -224,6 +224,11 @@ local function unloadTurtle(crafterName)
   parallel.waitForAll(table.unpack(tasks))
 end
 
+-- a turtle.craft of <=64 is instant and the rednet round-trip is sub-second,
+-- so this only needs to cover a hiccup - not 30s. A shorter deadline detects a
+-- dead/unloaded turtle far faster, freeing the round to requeue its batch.
+local CRAFT_TIMEOUT = 12
+
 -- dispatch one batch to one turtle: load ingredients, craft, unload.
 -- returns crafted count and an error class ("load" = missing ingredients now,
 -- won't self-resolve; "craft" = transient turtle failure, worth retrying).
@@ -235,9 +240,9 @@ local function dispatchBatch(a)
     return 0, "load", err
   end
   rednet.send(a.worker.id, { type = "craft", times = loaded }, PROTO)
-  local ok, deadline = false, os.clock() + 30
+  local ok, deadline = false, os.clock() + CRAFT_TIMEOUT
   while os.clock() < deadline do
-    local senderId, msg = rednet.receive(PROTO, 5)
+    local senderId, msg = rednet.receive(PROTO, 3)
     if senderId == a.worker.id and type(msg) == "table" and msg.type == "done" then
       ok = msg.ok
       break
