@@ -10,3 +10,6 @@ update.lua
 gfx.lua
 dashboard.lua
 snake.lua
+starlink.lua
+starlink_map.lua
+sableprobe.lua
