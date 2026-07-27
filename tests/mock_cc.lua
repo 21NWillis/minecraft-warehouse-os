@@ -38,3 +38,26 @@ end
 http = nil   -- tests always load from disk
 
 os.epoch = function() return math.floor(os.clock() * 1000) end
+
+-- minimal textutils.serialize/unserialize for headless tests
+textutils = {}
+local function ser(v)
+  if type(v) == "table" then
+    local parts = {}
+    for k, val in pairs(v) do
+      local key = type(k) == "number" and ("[" .. k .. "]") or (k .. "")
+      parts[#parts + 1] = key .. "=" .. ser(val)
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+  elseif type(v) == "string" then
+    return string.format("%q", v)
+  else
+    return tostring(v)
+  end
+end
+textutils.serialize = ser
+function textutils.unserialize(s)
+  local f = load("return " .. s)
+  if f then local ok, v = pcall(f); if ok then return v end end
+  return nil
+end
