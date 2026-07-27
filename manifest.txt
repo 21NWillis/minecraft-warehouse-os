@@ -35,3 +35,4 @@ conway.lua
 remote.lua
 vault.lua
 oracle.lua
+machine.lua
