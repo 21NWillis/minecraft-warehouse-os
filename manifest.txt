@@ -6,3 +6,6 @@ report.lua
 probe.lua
 pixeltest.lua
 update.lua
+gfx.lua
+dashboard.lua
+snake.lua
