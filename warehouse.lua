@@ -79,12 +79,19 @@ for _, side in ipairs(rs.getSides()) do
   if peripheral.getType(side) == "modem" then rednet.open(side) end
 end
 
-local function pickCrafter()
+local reserved = {}   -- rednet id -> true while a job is loaded on that turtle
+local craftBusy = false
+
+local function idleCrafters()
   rednet.broadcast({ type = "ping" }, PROTO)
   sleep(1)
+  local idle = {}
   for id, c in pairs(crafters) do
-    if os.clock() - c.seen < 60 then return id, c.name end
+    if not reserved[id] and os.clock() - c.seen < 60 then
+      idle[#idle + 1] = { id = id, name = c.name }
+    end
   end
+  return idle
 end
 
 -- --------------------------------------------------------------------- index
@@ -193,27 +200,63 @@ local function unloadTurtle(crafterName)
   parallel.waitForAll(table.unpack(tasks))
 end
 
-local function executeStep(step, crafterId, crafterName, report)
+-- one job: load a batch on one turtle, craft, wait, unload. writes results[i].
+local function runJob(step, job, results, i)
+  local loaded, err = loadBatch(job.crafter.name, step, job.batch)
+  if loaded == 0 then
+    unloadTurtle(job.crafter.name)
+    results[i] = { crafted = 0, err = err or "could not load ingredients" }
+    return
+  end
+  rednet.send(job.crafter.id, { type = "craft", times = loaded }, PROTO)
+  local ok = false
+  local deadline = os.clock() + 30
+  while os.clock() < deadline do
+    local senderId, msg = rednet.receive(PROTO, 5)
+    if senderId == job.crafter.id and type(msg) == "table" and msg.type == "done" then
+      ok = msg.ok
+      break
+    end
+  end
+  unloadTurtle(job.crafter.name)
+  results[i] = { crafted = ok and loaded or 0, err = not ok and "craft failed" or nil }
+end
+
+-- data-parallel across the turtle roster: a step's batches run simultaneously
+local function executeStep(step, report)
   local remaining = step.times
   while remaining > 0 do
-    local loaded, err = loadBatch(crafterName, step, math.min(remaining, 64))
-    if loaded == 0 then
-      unloadTurtle(crafterName)
-      return false, err or ("could not load ingredients for " .. displayName(step.output))
+    local workers = idleCrafters()
+    if #workers == 0 then return false, "no crafter turtles online" end
+
+    local jobs = {}
+    local pending = remaining
+    for _, worker in ipairs(workers) do
+      if pending <= 0 then break end
+      local batch = math.min(pending, 64)
+      pending = pending - batch
+      reserved[worker.id] = true
+      jobs[#jobs + 1] = { crafter = worker, batch = batch }
     end
-    rednet.send(crafterId, { type = "craft", times = loaded }, PROTO)
-    local ok = false
-    local deadline = os.clock() + 30
-    while os.clock() < deadline do
-      local senderId, msg = rednet.receive(PROTO, 5)
-      if senderId == crafterId and type(msg) == "table" and msg.type == "done" then
-        ok = msg.ok
-        break
-      end
+
+    local results = {}
+    local fns = {}
+    for i, job in ipairs(jobs) do
+      fns[i] = function() runJob(step, job, results, i) end
     end
-    unloadTurtle(crafterName)
-    if not ok then return false, "crafter failed on " .. displayName(step.output) end
-    remaining = remaining - loaded
+    parallel.waitForAll(table.unpack(fns))
+
+    local crafted, firstErr = 0, nil
+    for i, job in ipairs(jobs) do
+      reserved[job.crafter.id] = nil
+      local r = results[i] or {}
+      crafted = crafted + (r.crafted or 0)
+      firstErr = firstErr or r.err
+    end
+    if crafted == 0 then
+      return false, (firstErr or "no progress") .. " on " .. displayName(step.output)
+    end
+    remaining = remaining - crafted
     rescan()
     report(step, step.times - remaining)
   end
@@ -222,19 +265,24 @@ end
 
 local function craftItem(targetId, count, report)
   if not db or not planner then return false, "recipe db or planner not loaded" end
-  local crafterId, crafterName = pickCrafter()
-  if not crafterId then return false, "no crafter turtle online" end
-  rescan()
-  local have = {}
-  for id, entry in pairs(index) do have[id] = entry.count end
-  local steps, missingItems = planner.plan(db, have, targetId, count)
-  if not steps then return false, nil, missingItems end
-  for i, step in ipairs(steps) do
-    report(step, 0, i, #steps)
-    local ok, err = executeStep(step, crafterId, crafterName, report)
-    if not ok then return false, err end
-  end
-  return true, #steps
+  if craftBusy then return false, "factory busy - try again shortly" end
+  craftBusy = true
+  local ok, result = pcall(function()
+    rescan()
+    local have = {}
+    for id, entry in pairs(index) do have[id] = entry.count end
+    local steps, missingItems = planner.plan(db, have, targetId, count)
+    if not steps then return { false, nil, missingItems } end
+    for i, step in ipairs(steps) do
+      report(step, 0, i, #steps)
+      local stepOk, err = executeStep(step, report)
+      if not stepOk then return { false, err } end
+    end
+    return { true, #steps }
+  end)
+  craftBusy = false
+  if not ok then return false, "internal error: " .. tostring(result) end
+  return result[1], result[2], result[3]
 end
 
 -- ------------------------------------------------------------------ theme/UI
@@ -627,6 +675,57 @@ local function rosterLoop()
   end
 end
 
+-- -------------------------------------------------------------- auto-stocker
+local STOCK_FILE = "stock.cfg"
+local STOCK_INTERVAL = 60
+local stockTargets = {}   -- item id -> target count
+
+local function loadStock()
+  stockTargets = {}
+  local f = fs.open(STOCK_FILE, "r")
+  if not f then return end
+  while true do
+    local line = f.readLine()
+    if not line then break end
+    local id, count = line:match("^(%S+)%s+(%d+)$")
+    if id then stockTargets[id] = tonumber(count) end
+  end
+  f.close()
+end
+
+local function saveStock()
+  local f = fs.open(STOCK_FILE, "w")
+  for id, count in pairs(stockTargets) do
+    f.write(id .. " " .. count .. "\n")
+  end
+  f.close()
+end
+
+local function stockLoop()
+  sleep(30)
+  while true do
+    if db and planner and not craftBusy then
+      for id, target in pairs(stockTargets) do
+        local haveCount = index[id] and index[id].count or 0
+        if haveCount < target then
+          local wanted = target - haveCount
+          local ok = craftItem(id, wanted, function(step, done, i, total)
+            status = ("stock: %s (%s)"):format(displayName(step.output),
+              i and (i .. "/" .. total) or tostring(done))
+            draw()
+          end)
+          if ok then
+            status = ("stocked %d x %s"):format(wanted, displayName(id))
+          end
+          draw()
+          break  -- one target per cycle; keep the factory polite
+        end
+      end
+    end
+    sleep(STOCK_INTERVAL)
+  end
+end
+
 local function printStats()
   print(("%-8s %6s %8s %8s %8s"):format("op", "count", "total ms", "avg ms", "max ms"))
   for op, m in pairs(metrics) do
@@ -655,6 +754,39 @@ local function commandLoop()
       print("back to console - 'grid' to reopen")
     elseif cmd == "stats" then
       printStats()
+    elseif cmd == "stock" then
+      local sub = args[1]
+      if sub == "add" and args[2] then
+        local count = tonumber(args[#args])
+        if count then table.remove(args) else count = 64 end
+        table.remove(args, 1)
+        local hits = db and db.search(table.concat(args, " "), 5) or {}
+        if #hits == 0 then
+          print("no craftable item matches")
+        else
+          stockTargets[hits[1]] = count
+          saveStock()
+          print(("keeping %d x %s stocked"):format(count, displayName(hits[1])))
+        end
+      elseif sub == "del" and args[2] then
+        table.remove(args, 1)
+        local query = table.concat(args, " "):lower()
+        for id in pairs(stockTargets) do
+          if id:lower():find(query, 1, true) or displayName(id):lower():find(query, 1, true) then
+            stockTargets[id] = nil
+            saveStock()
+            print("no longer stocking " .. displayName(id))
+          end
+        end
+      else
+        local n = 0
+        for id, target in pairs(stockTargets) do
+          local haveCount = index[id] and index[id].count or 0
+          print(("%6d / %-6d %s"):format(haveCount, target, displayName(id)))
+          n = n + 1
+        end
+        if n == 0 then print("no stock targets - stock add <item> <count>") end
+      end
     elseif cmd == "crafters" then
       rednet.broadcast({ type = "ping" }, PROTO)
       sleep(1.5)
@@ -746,5 +878,6 @@ local function commandLoop()
 end
 
 rescan()
+loadStock()
 draw()
-parallel.waitForAny(rescanLoop, touchLoop, commandLoop, rosterLoop)
+parallel.waitForAny(rescanLoop, touchLoop, commandLoop, rosterLoop, stockLoop)
