@@ -37,3 +37,4 @@ vault.lua
 oracle.lua
 machine.lua
 menu.lua
+marquee.lua
