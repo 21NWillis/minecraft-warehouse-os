@@ -11,7 +11,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories {
     mavenCentral()
-    maven { url = 'https://squiddev.cc/maven' }
+    maven { url = 'https://maven.squiddev.cc' }
 }
 
 neoForge {
