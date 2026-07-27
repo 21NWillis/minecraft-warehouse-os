@@ -327,6 +327,7 @@ local function schedulerLoop()
         for id in pairs(jobStuck) do
           if not live[id] then jobStuck[id] = nil end
         end
+        if #snap > serve.peakQueue then serve.peakQueue = #snap end
         if snap[1] then
           status = ("craft %s %d/%d  [queue %d]"):format(
             snap[1].label, snap[1].done, snap[1].total, #snap)
@@ -340,6 +341,13 @@ end
 -- submit a craft job and block THIS coroutine until it finishes. The scheduler
 -- loop keeps running, so concurrent callers (player command + stock reconcile)
 -- interleave by priority instead of serializing behind a global lock.
+-- serving-engine telemetry: per-job latency ring, throughput, goodput
+local serve = {
+  since = os.epoch("utc"), jobsOk = 0, jobsFail = 0,
+  itemsOut = 0, lat = {}, latCur = 1, peakQueue = 0,
+}
+local inFlight = {}   -- targetId -> count of active jobs producing it (dedup)
+
 local jobSeq = 0
 local function craftItem(targetId, count, priority, report)
   if not db or not planner then return false, "recipe db or planner not loaded" end
@@ -353,6 +361,8 @@ local function craftItem(targetId, count, priority, report)
   jobSeq = jobSeq + 1
   local evt = "craftdone_" .. jobSeq
   local jobId = targetId .. "#" .. jobSeq
+  local submitAt = os.epoch("utc")
+  inFlight[targetId] = (inFlight[targetId] or 0) + 1
   sched:submit({
     id = jobId, priority = priority or 0, steps = steps,
     label = displayName(targetId),
@@ -360,9 +370,18 @@ local function craftItem(targetId, count, priority, report)
   })
   os.queueEvent("sched_work")
   rednet.broadcast({ type = "ping" }, PROTO)  -- warm roster once, not per round
-  -- progress is rendered by schedulerLoop from sched:snapshot(); the caller's
-  -- report closure (if any) is retained only for API compatibility.
   local _, ok, reason = os.pullEvent(evt)
+  inFlight[targetId] = math.max(0, (inFlight[targetId] or 1) - 1)
+  if inFlight[targetId] == 0 then inFlight[targetId] = nil end
+  -- record serving telemetry
+  if ok then
+    serve.jobsOk = serve.jobsOk + 1
+    serve.itemsOut = serve.itemsOut + count
+    serve.lat[serve.latCur] = os.epoch("utc") - submitAt
+    serve.latCur = serve.latCur % 256 + 1
+  else
+    serve.jobsFail = serve.jobsFail + 1
+  end
   return ok, ok and #steps or reason
 end
 
@@ -793,7 +812,8 @@ local function stockLoop()
     if db and planner then
       for id, target in pairs(stockTargets) do
         local haveCount = index[id] and index[id].count or 0
-        if haveCount < target then
+        -- dedup: skip if a job (player or prior cycle) is already producing it
+        if haveCount < target and not inFlight[id] then
           local wanted = target - haveCount
           -- priority 10: background reconcile yields to player requests (p0)
           local ok, detail, missingItems = craftItem(id, wanted, 10, function(step, done, i, total)
@@ -851,6 +871,25 @@ local function commandLoop()
       print("back to console - 'grid' to reopen")
     elseif cmd == "stats" then
       printStats()
+    elseif cmd == "serve" then
+      local elapsedMin = math.max(1/60, (os.epoch("utc") - serve.since) / 60000)
+      local samples = {}
+      for _, v in ipairs(serve.lat) do samples[#samples + 1] = v end
+      local liveQ = sched and #sched:snapshot() or 0
+      local idle = #idleCrafters()
+      local roster = 0
+      for _ in pairs(crafters) do roster = roster + 1 end
+      print("-- serving engine --")
+      print(("jobs: %d ok, %d failed   goodput %.1f%%"):format(
+        serve.jobsOk, serve.jobsFail,
+        serve.jobsOk + serve.jobsFail > 0
+          and 100 * serve.jobsOk / (serve.jobsOk + serve.jobsFail) or 100))
+      print(("throughput: %.1f items/min   %.2f jobs/min"):format(
+        serve.itemsOut / elapsedMin, serve.jobsOk / elapsedMin))
+      print(("job latency: p50 %dms  p99 %dms  (n=%d)"):format(
+        percentile(samples, 0.5), percentile(samples, 0.99), #samples))
+      print(("queue: %d now, %d peak   workers: %d idle / %d roster"):format(
+        liveQ, serve.peakQueue, idle, roster))
     elseif cmd == "stock" then
       local sub = args[1]
       if sub == "add" and args[2] then
