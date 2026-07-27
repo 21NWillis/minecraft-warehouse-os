@@ -87,6 +87,26 @@ do
   check("stops when material runs out", err ~= nil and placed == 10, (placed or "?") .. " / err=" .. tostring(err))
 end
 
+-- network-refill: a turtle whose hold is far too small still completes a large
+-- build by docking to restock (ops.dock tops it up, like an ender chest at home)
+do
+  local s = schematic.solid(6, 6, 6, "minecraft:stone")  -- 216 blocks
+  local plan = s:plan()
+  local mock = newMock({ ["minecraft:stone"] = 32 })       -- only 32 in hold
+  local dockRuns = 0
+  mock.ops.dock = function(block)
+    dockRuns = dockRuns + 1
+    mock.inv[block] = (mock.inv[block] or 0) + 64            -- restock a stack
+  end
+  local placed, err = builder.run(plan, mock.ops)
+  check("refill build completes despite tiny hold", err == nil and placed == 216,
+    (placed or "?") .. "/216 err=" .. tostring(err))
+  check("refill build matched (docked " .. dockRuns .. "x)", (function()
+    for k, b in pairs(s.cells) do if mock.world[k] ~= b then return false end end
+    return true
+  end)(), "dockRuns=" .. dockRuns)
+end
+
 -- big structure: 16x10x16 hollow tower, sanity on scale
 do
   local s = schematic.hollowBox(16, 10, 16, "minecraft:stone", { floor = true, roof = true })

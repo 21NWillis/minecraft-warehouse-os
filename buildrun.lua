@@ -95,6 +95,30 @@ local ops = {
   placeDown = function() return turtle.placeDown() end,
 }
 
+-- network-refill via a carried ender chest (reserve a slot for one, stocked
+-- from the warehouse). When the builder runs dry it flies home-high and calls
+-- this: deploy the chest above, pull build materials, reclaim it. Pose-neutral
+-- (place/suck/dig up don't move the turtle), so the builder's tracking holds.
+local ENDER_CHEST = "enderstorage:ender_chest"
+ops.dock = function(want)
+  local chestSlot
+  for slot = 1, 16 do
+    local d = turtle.getItemDetail(slot)
+    if d and d.name == ENDER_CHEST then chestSlot = slot break end
+  end
+  if not chestSlot then return end          -- no chest carried; builder will fail
+  turtle.select(chestSlot)
+  if not turtle.placeUp() then return end
+  for slot = 1, 16 do
+    if slot ~= chestSlot then
+      turtle.select(slot)
+      turtle.suckUp(64)                       -- pull stacks of build materials
+    end
+  end
+  turtle.select(chestSlot)
+  turtle.digUp()                              -- reclaim the ender chest
+end
+
 local start = os.epoch and os.epoch("utc") or 0
 local placed, err = builder.run(plan, ops, function(done, total)
   if done % 16 == 0 or done == total then

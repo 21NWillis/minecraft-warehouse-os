@@ -55,7 +55,17 @@ function builder.run(plan, ops, onProgress)
   for _, p in ipairs(plan) do if p.y > maxY then maxY = p.y end end
   for i, p in ipairs(plan) do
     if ops.ensure and not ops.ensure(p.block) then
-      return i - 1, "out of material: " .. p.block
+      -- out of this material: if a dock is configured, fly home, restock, and
+      -- resume. Lets a 16-slot turtle build structures far larger than its hold.
+      if ops.dock then
+        moveTo(ops, pose, 0, maxY + 2, 0)
+        ops.dock(p.block)
+        if not ops.ensure(p.block) then
+          return i - 1, "dock lacks material: " .. p.block
+        end
+      else
+        return i - 1, "out of material: " .. p.block
+      end
     end
     -- target hover cell is one above the block we place downward
     if not moveTo(ops, pose, p.x, p.y + 1, p.z) then
