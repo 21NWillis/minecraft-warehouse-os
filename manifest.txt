@@ -14,3 +14,6 @@ snake.lua
 starlink.lua
 starlink_map.lua
 sableprobe.lua
+schematic.lua
+builder.lua
+buildrun.lua
