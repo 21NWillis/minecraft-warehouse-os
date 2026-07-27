@@ -110,6 +110,20 @@ function db.recipesFor(id)
   for _, lineIdx in ipairs(byOutput[id] or {}) do
     result[#result + 1] = parseLine(recipeLines[lineIdx])
   end
+  -- prefer the least surprising recipe first (planner's first attempt + CLI
+  -- display): score by how many ingredients are vanilla items or common tags.
+  local function vanillaScore(recipe)
+    local score = 0
+    for _, ing in pairs(recipe.grid) do
+      if ing:find("minecraft:", 1, true) or ing:find("#c:", 1, true) then
+        score = score + 1
+      end
+    end
+    return score
+  end
+  table.sort(result, function(a, b)
+    return vanillaScore(a) > vanillaScore(b)
+  end)
   return result
 end
 

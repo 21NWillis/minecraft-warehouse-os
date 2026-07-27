@@ -16,6 +16,19 @@ from pathlib import Path
 
 MODS_DIR = Path("/mnt/d/corge/Instances/The Neutral Pack that does nothing/mods")
 OUT_DIR = Path("/mnt/d/corge/Instances/The Neutral Pack that does nothing/cc-scripts/data")
+# Vanilla recipes/tags/lang live in the Minecraft jar, and the "c:" convention
+# tags (c:dusts/redstone, c:ingots/*, ...) that modded recipes depend on live
+# in NeoForge's merged data - neither is in the mods folder. Both are byproducts
+# the mod build already downloaded; globbed so version bumps don't break paths.
+NEOFORM_CACHE = Path("/mnt/c/Users/nlwil/.gradle/caches/neoformruntime")
+
+
+def find_data_jars():
+    jars = []
+    for pattern in ("artifacts/minecraft_*_client.jar",
+                    "intermediate_results/compiledWithNeoForge_*output.jar"):
+        jars.extend(sorted(NEOFORM_CACHE.glob(pattern)))
+    return jars
 
 SHAPED_TYPES = {"minecraft:crafting_shaped", "crafting_shaped"}
 SHAPELESS_TYPES = {"minecraft:crafting_shapeless", "crafting_shapeless"}
@@ -93,6 +106,12 @@ def main():
     names = {}
 
     jars = sorted(MODS_DIR.glob("*.jar"))
+    data_jars = find_data_jars()
+    if data_jars:
+        jars = data_jars + jars
+    else:
+        print(f"WARNING: no vanilla/neoforge data jars found under {NEOFORM_CACHE}")
+        print("  vanilla recipes and c: convention tags will be MISSING")
     for jar in jars:
         try:
             z = zipfile.ZipFile(jar)

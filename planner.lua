@@ -40,6 +40,43 @@ function planner.plan(db, have, targetId, targetCount)
     return score
   end
 
+  -- can this item be crafted using only ingredients currently in stock?
+  -- one level of lookahead - enough to disambiguate tag options like which
+  -- plank type is reachable from the logs we actually hold.
+  local function craftableFromStock(itemId)
+    for _, recipe in ipairs(db.recipesFor(itemId)) do
+      local allInStock = true
+      for _, ing in pairs(recipe.grid) do
+        local satisfied = false
+        for _, opt in ipairs(db.options(ing)) do
+          if (have[opt] or 0) > 0 then satisfied = true break end
+        end
+        if not satisfied then allInStock = false break end
+      end
+      if allInStock then return true end
+    end
+    return false
+  end
+
+  -- choose the best concrete item for a tag/alternatives ingredient:
+  -- in stock > craftable from stock > craftable > merely exists.
+  local function pickOption(ing)
+    local opts = db.options(ing)
+    local best, bestScore
+    for _, opt in ipairs(opts) do
+      local score
+      if (have[opt] or 0) > 0 then score = 3
+      elseif craftableFromStock(opt) then score = 2
+      elseif db.isCraftable(opt) then score = 1
+      else score = 0 end
+      if not bestScore or score > bestScore then
+        best, bestScore = opt, score
+        if score == 3 then break end
+      end
+    end
+    return best
+  end
+
   local need
 
   local function tryRecipe(itemId, amount, recipe)
@@ -47,17 +84,7 @@ function planner.plan(db, have, targetId, targetCount)
     local picks = {}
     local depTotals = {}
     for slot, ing in pairs(recipe.grid) do
-      local opts = db.options(ing)
-      local chosen
-      for _, opt in ipairs(opts) do
-        if (have[opt] or 0) > 0 then chosen = opt break end
-      end
-      if not chosen then
-        for _, opt in ipairs(opts) do
-          if db.isCraftable(opt) then chosen = opt break end
-        end
-      end
-      chosen = chosen or opts[1]
+      local chosen = pickOption(ing)
       if not chosen then
         missing[ing] = (missing[ing] or 0) + times
         return false
