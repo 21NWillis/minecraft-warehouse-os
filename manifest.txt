@@ -38,3 +38,4 @@ oracle.lua
 machine.lua
 menu.lua
 marquee.lua
+doctor.lua
