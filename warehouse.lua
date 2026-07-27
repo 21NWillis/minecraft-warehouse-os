@@ -43,11 +43,24 @@ local function timed(op, fn, ...)
   local results = table.pack(fn(...))
   local dt = os.epoch("utc") - t0
   local m = metrics[op]
-  if not m then m = { count = 0, totalMs = 0, maxMs = 0 }; metrics[op] = m end
+  if not m then
+    m = { count = 0, totalMs = 0, maxMs = 0, samples = {}, cursor = 1 }
+    metrics[op] = m
+  end
   m.count = m.count + 1
   m.totalMs = m.totalMs + dt
   if dt > m.maxMs then m.maxMs = dt end
+  m.samples[m.cursor] = dt
+  m.cursor = m.cursor % 512 + 1
   return table.unpack(results, 1, results.n)
+end
+
+local function percentile(samples, p)
+  local sorted = {}
+  for _, v in ipairs(samples) do sorted[#sorted + 1] = v end
+  if #sorted == 0 then return 0 end
+  table.sort(sorted)
+  return sorted[math.max(1, math.ceil(p * #sorted))]
 end
 
 -- ----------------------------------------------------------------- recipe db
@@ -727,9 +740,10 @@ local function stockLoop()
 end
 
 local function printStats()
-  print(("%-8s %6s %8s %8s %8s"):format("op", "count", "total ms", "avg ms", "max ms"))
+  print(("%-8s %6s %7s %7s %7s %7s"):format("op", "count", "avg", "p50", "p99", "max"))
   for op, m in pairs(metrics) do
-    print(("%-8s %6d %8d %8.1f %8d"):format(op, m.count, m.totalMs, m.totalMs / m.count, m.maxMs))
+    print(("%-8s %6d %7.1f %7d %7d %7d"):format(op, m.count, m.totalMs / m.count,
+      percentile(m.samples, 0.5), percentile(m.samples, 0.99), m.maxMs))
   end
 end
 
