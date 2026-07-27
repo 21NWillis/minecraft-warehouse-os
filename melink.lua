@@ -5,16 +5,7 @@
 -- indexing every faction's storage.
 local starlink = require("starlink")
 
-local emc = {}
-if fs.exists("data/emc.txt") then
-  local f = fs.open("data/emc.txt", "r")
-  while true do
-    local line = f.readLine(); if not line then break end
-    local id, v = line:match("^(%S+)%s+([%d%.]+)$")
-    if id then emc[id] = tonumber(v) end
-  end
-  f.close()
-end
+local emc = require("emcload").load()
 
 local function fmt(n)
   if n >= 1e9 then return ("%.2fB"):format(n / 1e9) end

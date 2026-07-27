@@ -28,18 +28,8 @@ local controller = peripheral.wrap(controllerName)
 local trashName = find({ "trash", "void", "burn" })
 local deliveryName = find({ "enderstorage", "minecraft:chest", "minecraft:barrel" })
 
-local emc = {}
-do
-  local f = fs.open("data/emc.txt", "r")
-  if not f then error("data/emc.txt missing (run `update`)") end
-  while true do
-    local line = f.readLine()
-    if not line then break end
-    local id, v = line:match("^(%S+)%s+([%d%.]+)$")
-    if id then emc[id] = tonumber(v) end
-  end
-  f.close()
-end
+local emc = require("emcload").load()
+if not next(emc) then error("no EMC data (need data/emc.txt on disk or an update base url to stream)") end
 
 local function balance()
   local f = fs.open(BAL_FILE, "r")

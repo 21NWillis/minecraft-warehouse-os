@@ -25,7 +25,6 @@ harvest.lua
 seed.lua
 seed_manifest.txt
 transmute.lua
-data/emc.txt
 attract.lua
 music.lua
 pa.lua
@@ -40,3 +39,4 @@ menu.lua
 marquee.lua
 doctor.lua
 selftest.lua
+emcload.lua

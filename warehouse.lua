@@ -90,17 +90,9 @@ do
   -- cost-aware cached planner (RadixAttention DAG + EMC); planner is the fallback
   local ok3, pcmod = pcall(require, "plancache")
   if ok3 and db then
-    local emcMap, any = {}, false
-    if fs.exists("data/emc.txt") then
-      local f = fs.open("data/emc.txt", "r")
-      while true do
-        local l = f.readLine(); if not l then break end
-        local id, v = l:match("^(%S+)%s+([%d%.]+)$")
-        if id then emcMap[id] = tonumber(v); any = true end
-      end
-      f.close()
-    end
-    pc = pcmod.new(db, any and emcMap or nil)
+    local ok4, emcload = pcall(require, "emcload")
+    local emcMap = ok4 and emcload.load() or {}
+    pc = pcmod.new(db, next(emcMap) and emcMap or nil)
   end
 end
 

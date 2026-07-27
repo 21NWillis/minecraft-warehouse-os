@@ -11,16 +11,7 @@ for _, n in ipairs(peripheral.getNames()) do
 end
 if not controller then error("no storage controller on the network") end
 
-local emc = {}
-if fs.exists("data/emc.txt") then
-  local f = fs.open("data/emc.txt", "r")
-  while true do
-    local line = f.readLine(); if not line then break end
-    local id, v = line:match("^(%S+)%s+([%d%.]+)$")
-    if id then emc[id] = tonumber(v) end
-  end
-  f.close()
-end
+local emc = require("emcload").load()
 
 local function pretty(id) return (id:gsub("^[^:]+:", ""):gsub("_", " "):upper()) end
 local function fmt(n)
