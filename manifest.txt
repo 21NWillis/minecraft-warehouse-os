@@ -29,3 +29,4 @@ data/emc.txt
 attract.lua
 music.lua
 pa.lua
+exchange.lua
