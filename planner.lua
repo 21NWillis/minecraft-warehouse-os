@@ -14,16 +14,20 @@ function planner.plan(db, have, targetId, targetCount)
   local steps = {}
   local missing = {}
   local path = {}
+  -- KV-cache accounting: demand served from the drawer wall (a "cache hit")
+  -- vs demand that forced a craft (a "miss"). The shared store IS the cache.
+  local stats = { served = 0, crafted = 0 }
 
   local function snapshot()
     local copy = {}
     for k, v in pairs(have) do copy[k] = v end
-    return copy
+    return { have = copy, served = stats.served, crafted = stats.crafted }
   end
 
-  local function restore(copy, stepsMark)
+  local function restore(snap, stepsMark)
     for k in pairs(have) do have[k] = nil end
-    for k, v in pairs(copy) do have[k] = v end
+    for k, v in pairs(snap.have) do have[k] = v end
+    stats.served, stats.crafted = snap.served, snap.crafted
     while #steps > stepsMark do steps[#steps] = nil end
   end
 
@@ -105,7 +109,9 @@ function planner.plan(db, have, targetId, targetCount)
     local take = math.min(stock, amount)
     have[itemId] = stock - take
     amount = amount - take
+    stats.served = stats.served + take        -- cache hit: served from stock
     if amount <= 0 then return true end
+    stats.crafted = stats.crafted + amount     -- cache miss: must craft this
 
     if path[itemId] then
       missing[itemId] = (missing[itemId] or 0) + amount
@@ -138,9 +144,9 @@ function planner.plan(db, have, targetId, targetCount)
   end
 
   if need(targetId, targetCount) then
-    return steps
+    return steps, nil, stats
   end
-  return nil, missing
+  return nil, missing, stats
 end
 
 return planner

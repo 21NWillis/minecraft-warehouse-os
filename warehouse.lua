@@ -345,6 +345,7 @@ end
 local serve = {
   since = os.epoch("utc"), jobsOk = 0, jobsFail = 0,
   itemsOut = 0, lat = {}, latCur = 1, peakQueue = 0,
+  cacheHit = 0, cacheMiss = 0,   -- items served from the drawer wall vs crafted
 }
 local inFlight = {}   -- targetId -> count of active jobs producing it (dedup)
 
@@ -355,8 +356,12 @@ local function craftItem(targetId, count, priority, report)
   rescan()
   local have = {}
   for id, entry in pairs(index) do have[id] = entry.count end
-  local steps, missingItems = planner.plan(db, have, targetId, count)
+  local steps, missingItems, pstats = planner.plan(db, have, targetId, count)
   if not steps then return false, nil, missingItems end
+  if pstats then
+    serve.cacheHit = serve.cacheHit + pstats.served
+    serve.cacheMiss = serve.cacheMiss + pstats.crafted
+  end
 
   jobSeq = jobSeq + 1
   local evt = "craftdone_" .. jobSeq
@@ -890,6 +895,10 @@ local function commandLoop()
         percentile(samples, 0.5), percentile(samples, 0.99), #samples))
       print(("queue: %d now, %d peak   workers: %d idle / %d roster"):format(
         liveQ, serve.peakQueue, idle, roster))
+      local cacheTotal = serve.cacheHit + serve.cacheMiss
+      print(("cache: %.1f%% hit rate  (%d served from stock / %d crafted)"):format(
+        cacheTotal > 0 and 100 * serve.cacheHit / cacheTotal or 0,
+        serve.cacheHit, serve.cacheMiss))
     elseif cmd == "stock" then
       local sub = args[1]
       if sub == "add" and args[2] then

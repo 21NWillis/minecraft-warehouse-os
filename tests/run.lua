@@ -60,9 +60,12 @@ local planner = require("planner")
 
 -- direct craft from stock
 local have = { ["minecraft:oak_planks"] = 64 }
-local steps, missing = planner.plan(db, have, "minecraft:chest", 1)
+local steps, missing, stats = planner.plan(db, have, "minecraft:chest", 1)
 check("plan chest from planks", steps and #steps == 1,
   steps and #steps or next(missing or {}))
+check("cache stats: 8 planks served, 1 chest crafted",
+  stats and stats.served == 8 and stats.crafted == 1,
+  stats and (stats.served .. "/" .. stats.crafted))
 if steps then
   check("chest step targets chest", steps[1].output == "minecraft:chest",
     steps[1].output)
