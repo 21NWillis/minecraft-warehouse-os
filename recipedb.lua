@@ -8,21 +8,33 @@ local byOutput = {}   -- item id -> { line indexes }
 local tags = {}       -- "c:ingots/iron" -> { concrete item ids }
 local names = {}      -- item id -> display name
 
-local function eachLine(path, fn)
-  local f = fs.open(path, "r")
-  if not f then return false end
+-- open a data file from disk, or stream it from the update base URL
+-- (the 1MB computer disk can't hold the database; RAM can)
+local function openLines(dir, fname)
+  local path = fs.combine(dir, fname)
+  if fs.exists(path) then return fs.open(path, "r") end
+  if http and fs.exists(".updatebase") then
+    local f = fs.open(".updatebase", "r")
+    local base = f.readAll()
+    f.close()
+    return (http.get(base .. "data/" .. fname))
+  end
+end
+
+local function eachLine(handle, fn)
+  if not handle then return false end
   while true do
-    local line = f.readLine()
+    local line = handle.readLine()
     if not line then break end
     if line ~= "" then fn(line) end
   end
-  f.close()
+  handle.close()
   return true
 end
 
 function db.load(dir)
   recipeLines, byOutput, tags, names = {}, {}, {}, {}
-  local ok = eachLine(fs.combine(dir, "recipes.txt"), function(line)
+  local ok = eachLine(openLines(dir, "recipes.txt"), function(line)
     recipeLines[#recipeLines + 1] = line
     local out = line:match("^[SL]|([^|]+)|")
     if out then
@@ -31,14 +43,14 @@ function db.load(dir)
       list[#list + 1] = #recipeLines
     end
   end)
-  if not ok then return false, "missing " .. fs.combine(dir, "recipes.txt") end
-  eachLine(fs.combine(dir, "tags.txt"), function(line)
+  if not ok then return false, "no recipes.txt on disk and no update base url for streaming" end
+  eachLine(openLines(dir, "tags.txt"), function(line)
     local fields = {}
     for field in line:gmatch("[^|]+") do fields[#fields + 1] = field end
     local tag = table.remove(fields, 1):sub(2)
     tags[tag] = fields
   end)
-  eachLine(fs.combine(dir, "names.txt"), function(line)
+  eachLine(openLines(dir, "names.txt"), function(line)
     local id, name = line:match("^([^\t]+)\t(.+)$")
     if id then names[id] = name end
   end)
