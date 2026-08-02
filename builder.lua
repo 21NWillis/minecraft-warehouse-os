@@ -82,5 +82,62 @@ function builder.run(plan, ops, onProgress)
   return total, nil
 end
 
+-- standard in-game ops for builder.run: real turtle moves, slot-scan ensure,
+-- and ender-chest network refill (deploy overhead, pull stacks, reclaim).
+-- Only touches the turtle API when actually called, so requiring this stays
+-- headless-safe. opts.enderChest overrides the refill chest id. opts.track
+-- (fn(opName)) is called after every successful move/turn - lets a caller
+-- mirror the turtle's pose in a second frame (datacenter's datum frame).
+function builder.turtleOps(opts)
+  opts = opts or {}
+  local ECHEST = opts.enderChest or "enderstorage:ender_chest"
+  local track = opts.track
+  local function tracked(name, fn)
+    return function()
+      local ok = fn()
+      if ok and track then track(name) end
+      return ok
+    end
+  end
+  local ops = {
+    up = tracked("up", turtle.up),
+    down = tracked("down", turtle.down),
+    forward = tracked("forward", turtle.forward),
+    turnLeft = tracked("turnLeft", function() turtle.turnLeft() return true end),
+    turnRight = tracked("turnRight", function() turtle.turnRight() return true end),
+    placeDown = function() return turtle.placeDown() end,
+    ensure = function(want)
+      local cur = turtle.getItemDetail()
+      if cur and cur.name == want then return true end
+      for slot = 1, 16 do
+        local d = turtle.getItemDetail(slot)
+        if d and d.name == want then turtle.select(slot); return true end
+      end
+      return false
+    end,
+  }
+  -- network refill via a carried ender chest: deploy overhead, pull stacks,
+  -- reclaim. Pose-neutral (placeUp/suckUp/digUp don't move the turtle).
+  ops.dock = function()
+    local chestSlot
+    for slot = 1, 16 do
+      local d = turtle.getItemDetail(slot)
+      if d and d.name == ECHEST then chestSlot = slot break end
+    end
+    if not chestSlot then return end        -- no chest carried; builder will fail
+    turtle.select(chestSlot)
+    if not turtle.placeUp() then return end
+    for slot = 1, 16 do
+      if slot ~= chestSlot then
+        turtle.select(slot)
+        turtle.suckUp(64)
+      end
+    end
+    turtle.select(chestSlot)
+    turtle.digUp()
+  end
+  return ops
+end
+
 builder._internal = { moveTo = moveTo, newPose = newPose, DIRS = DIRS }
 return builder

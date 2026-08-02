@@ -93,46 +93,9 @@ do
   end
 end
 
--- turtle ops. ensure() selects a slot holding the needed block (turtles hold
--- one build material per slot; we scan on demand and cache the current pick).
-local ops = {
-  up = turtle.up, down = turtle.down, forward = turtle.forward,
-  turnLeft = turtle.turnLeft, turnRight = turtle.turnRight,
-  ensure = function(want)
-    local cur = turtle.getItemDetail()
-    if cur and cur.name == want then return true end
-    for slot = 1, 16 do
-      local d = turtle.getItemDetail(slot)
-      if d and d.name == want then turtle.select(slot); return true end
-    end
-    return false
-  end,
-  placeDown = function() return turtle.placeDown() end,
-}
-
--- network-refill via a carried ender chest (reserve a slot for one, stocked
--- from the warehouse). When the builder runs dry it flies home-high and calls
--- this: deploy the chest above, pull build materials, reclaim it. Pose-neutral
--- (place/suck/dig up don't move the turtle), so the builder's tracking holds.
-local ENDER_CHEST = "enderstorage:ender_chest"
-ops.dock = function(want)
-  local chestSlot
-  for slot = 1, 16 do
-    local d = turtle.getItemDetail(slot)
-    if d and d.name == ENDER_CHEST then chestSlot = slot break end
-  end
-  if not chestSlot then return end          -- no chest carried; builder will fail
-  turtle.select(chestSlot)
-  if not turtle.placeUp() then return end
-  for slot = 1, 16 do
-    if slot ~= chestSlot then
-      turtle.select(slot)
-      turtle.suckUp(64)                       -- pull stacks of build materials
-    end
-  end
-  turtle.select(chestSlot)
-  turtle.digUp()                              -- reclaim the ender chest
-end
+-- standard turtle ops (slot-scan ensure + ender-chest network refill) live in
+-- builder.turtleOps so datacenter.lua shares the exact same machinery.
+local ops = builder.turtleOps()
 
 local start = os.epoch and os.epoch("utc") or 0
 local placed, err = builder.run(plan, ops, function(done, total)

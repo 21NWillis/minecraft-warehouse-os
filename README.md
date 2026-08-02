@@ -42,6 +42,11 @@ Boot `menu` for the launcher. Deploy with `update` (below).
 - `schematic.lua` / `builder.lua` / `buildrun.lua` — generate & build structures
   with a turtle (box/tower/cylinder/**evilhq**/**paperclip** — the Doofenshmirtz
   HQ with the glowing P), network-refill via ender chest.
+- `datacenter.lua` — the void campus: six structures defined as offsets from a
+  single Void Portal block; `bill` prints per-phase material checklists,
+  `build` flies the turtle out from the portal, builds, and flies home. Layout
+  invariants (no overlaps, clear flight corridor) are test-enforced. Order of
+  operations: `planning/datacenter_runbook.md`.
 - `autopilot.lua` — PID flight controller for a Sable / Create Aeronautics ship.
 
 **Power & diagnostics**

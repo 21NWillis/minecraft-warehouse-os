@@ -122,6 +122,99 @@ function schematic.evilTower(w, h, palette)
   return s
 end
 
+-- lit platform: trim rim, glow grid every 4 blocks (spawn-proofing doubles as
+-- decor), optional holes (e.g. leave the void portal block in place at the
+-- campus datum). opts.holes = { {x,z}, ... }
+function schematic.pad(w, d, palette, opts)
+  palette = palette or {}
+  opts = opts or {}
+  local wall = palette.wall or "minecraft:purple_concrete"
+  local trim = palette.trim or "minecraft:polished_blackstone"
+  local glow = palette.glow or "minecraft:sea_lantern"
+  local s = schematic.new(w, 1, d)
+  local holes = {}
+  for _, hxz in ipairs(opts.holes or {}) do holes[hxz[1] .. "," .. hxz[2]] = true end
+  for x = 0, w - 1 do
+    for z = 0, d - 1 do
+      if not holes[x .. "," .. z] then
+        if x == 0 or x == w - 1 or z == 0 or z == d - 1 then s:set(x, 0, z, trim)
+        elseif x % 4 == 2 and z % 4 == 2 then s:set(x, 0, z, glow)
+        else s:set(x, 0, z, wall) end
+      end
+    end
+  end
+  return s
+end
+
+-- a hall: perimeter walls with corner trim + glass window bands, full roof,
+-- lit interior floor, and a 3-wide 3-tall doorway. opts.door picks the face
+-- the doorway is on: "-z" (default), "+z", "-x", "+x".
+function schematic.hall(w, h, d, palette, opts)
+  palette = palette or {}
+  opts = opts or {}
+  local wall = palette.wall or "minecraft:purple_concrete"
+  local trim = palette.trim or "minecraft:polished_blackstone"
+  local glass = palette.glass or "minecraft:gray_stained_glass"
+  local glow = palette.glow or "minecraft:sea_lantern"
+  local s = schematic.new(w, h, d)
+  local door = opts.door or "-z"
+  local mx, mz = math.floor(w / 2), math.floor(d / 2)
+  local function inDoor(x, y, z)
+    if y < 1 or y > 3 then return false end
+    if door == "-z" then return z == 0 and x >= mx - 1 and x <= mx + 1 end
+    if door == "+z" then return z == d - 1 and x >= mx - 1 and x <= mx + 1 end
+    if door == "-x" then return x == 0 and z >= mz - 1 and z <= mz + 1 end
+    if door == "+x" then return x == w - 1 and z >= mz - 1 and z <= mz + 1 end
+    return false
+  end
+  for y = 0, h - 1 do
+    for x = 0, w - 1 do
+      for z = 0, d - 1 do
+        local edge = x == 0 or x == w - 1 or z == 0 or z == d - 1
+        local corner = (x == 0 or x == w - 1) and (z == 0 or z == d - 1)
+        if y == 0 then
+          if edge then s:set(x, y, z, trim)
+          elseif x % 4 == 2 and z % 4 == 2 then s:set(x, y, z, glow)
+          else s:set(x, y, z, wall) end
+        elseif y == h - 1 then
+          s:set(x, y, z, wall)
+        elseif edge and not inDoor(x, y, z) then
+          local band = y >= 3 and y <= h - 3 and y % 3 == 0
+          if corner then s:set(x, y, z, trim)
+          elseif band then s:set(x, y, z, glass)
+          else s:set(x, y, z, wall) end
+        end
+      end
+    end
+  end
+  return s
+end
+
+-- strainer deck: watertight underlayer + a lip level with open 2-wide water
+-- channels running the full length, 1-wide lit walkways between, and a full
+-- perimeter lip (water stays in, you don't walk into the void). Width is
+-- derived from the channel count: w = channels*3 + 1.
+function schematic.channelPad(channels, d, palette)
+  palette = palette or {}
+  local wall = palette.wall or "minecraft:purple_concrete"
+  local trim = palette.trim or "minecraft:polished_blackstone"
+  local glow = palette.glow or "minecraft:sea_lantern"
+  local w = channels * 3 + 1
+  local s = schematic.new(w, 2, d)
+  for x = 0, w - 1 do
+    for z = 0, d - 1 do
+      s:set(x, 0, z, wall)
+      local ix = x - 1
+      if x == 0 or x == w - 1 or z == 0 or z == d - 1 then
+        s:set(x, 1, z, trim)
+      elseif ix % 3 == 2 then
+        s:set(x, 1, z, z % 4 == 2 and glow or trim)
+      end
+    end
+  end
+  return s
+end
+
 -- Paperclip Corp HQ: a Doofenshmirtz-grade corporate tower. Wide base with an
 -- arched entry and window band, a tapered purple shaft with tinted window
 -- rings and a glowing "P", an overhanging head with a lit sign band, and a

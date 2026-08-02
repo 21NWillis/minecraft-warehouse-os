@@ -16,6 +16,7 @@ menu.programs = {
   { script = "conway",     desc = "Game of Life" },
   { script = "recipes",    desc = "recipe lookup" },
   { script = "transmute",  desc = "Equivalent Exchange" },
+  { script = "datacenter", desc = "void campus builder (map/bill/build)" },
   { script = "reactor",    desc = "fission reactor controller" },
   { script = "profiler",   desc = "tick-lag + peripheral latency profiler" },
   { script = "bridge",     desc = "cross-layer comms (snapshot/run)" },
