@@ -40,8 +40,19 @@ Boot `menu` for the launcher. Deploy with `update` (below).
   dead-worker reclaim, resume).
 - `harvest.lua` — regrowth-aware GeOre harvesting scheduler (renewable, no mining).
 - `schematic.lua` / `builder.lua` / `buildrun.lua` — generate & build structures
-  with a turtle (box/tower/cylinder/**evilhq**), network-refill via ender chest.
+  with a turtle (box/tower/cylinder/**evilhq**/**paperclip** — the Doofenshmirtz
+  HQ with the glowing P), network-refill via ender chest.
 - `autopilot.lua` — PID flight controller for a Sable / Create Aeronautics ship.
+
+**Power & diagnostics**
+- `reactor.lua` + `reactorlogic.lua` — Mekanism fission reactor controller:
+  2 Hz safety interlocks (temp/damage/coolant/heated/waste), scram **latch**
+  (restart takes force), ramped burn control. The decision core is pure Lua
+  and headless-tested; the reactor never auto-starts.
+- `profiler.lua` + `metrics.lua` — perf toolkit for a `computer_threads=1`
+  server where every computer shares one ~10ms/tick exec budget: tick-lag
+  probe (how late a 0-tick timer fires) and per-method `peripheral.call`
+  latency attribution (n/total/p50/p99/max) around any program run.
 
 **Network & comms**
 - `starlink.lua` — wireless mesh link-layer with real RTT.
@@ -74,5 +85,7 @@ reboot
 ## Roadmap
 
 Machine-driven production wired into the auto-stocker, GPU-accelerated planning,
-a natural-language front door, and an orbital datacenter (hovering, for the
-server's sake). None of this is necessary. All of it is happening.
+a natural-language front door, an orbital datacenter (hovering, for the
+server's sake), the strainer casino floor (`planning/strainer_floor.md`), and
+client-side QoL mods built for this pack. None of this is necessary. All of it
+is happening.

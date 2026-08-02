@@ -40,3 +40,7 @@ marquee.lua
 doctor.lua
 selftest.lua
 emcload.lua
+metrics.lua
+profiler.lua
+reactorlogic.lua
+reactor.lua

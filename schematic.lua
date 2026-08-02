@@ -122,6 +122,97 @@ function schematic.evilTower(w, h, palette)
   return s
 end
 
+-- Paperclip Corp HQ: a Doofenshmirtz-grade corporate tower. Wide base with an
+-- arched entry and window band, a tapered purple shaft with tinted window
+-- rings and a glowing "P", an overhanging head with a lit sign band, and a
+-- swooping rooftop fin that curls over the edge (you know the silhouette).
+-- ~1200 blocks, 4 materials, 15x11 footprint, 38 tall. The P faces -z.
+function schematic.paperclipHQ(palette)
+  palette = palette or {}
+  local wall  = palette.wall  or "minecraft:purple_concrete"
+  local trim  = palette.trim  or "minecraft:polished_blackstone"
+  local glass = palette.glass or "minecraft:gray_stained_glass"
+  local glow  = palette.glow  or "minecraft:sea_lantern"
+
+  local s = schematic.new(15, 38, 11)
+
+  -- base: 15x11, y 0..7 - walls with corner trim, window band, entry arch
+  for y = 0, 7 do
+    for x = 0, 14 do
+      for z = 0, 10 do
+        if x == 0 or x == 14 or z == 0 or z == 10 then
+          local corner = (x == 0 or x == 14) and (z == 0 or z == 10)
+          local door = z == 0 and x >= 6 and x <= 8 and y >= 1 and y <= 3
+          if not door then
+            if corner then s:set(x, y, z, trim)
+            elseif y >= 3 and y <= 5 then s:set(x, y, z, glass)
+            else s:set(x, y, z, wall) end
+          end
+        end
+      end
+    end
+  end
+  for x = 0, 14 do
+    for z = 0, 10 do
+      if not s:get(x, 7, z) then s:set(x, 7, z, wall) end  -- base roof
+    end
+  end
+
+  -- shaft: 7x7 (x 4..10, z 2..8), y 8..25 - corner trim + window rings
+  for y = 8, 25 do
+    for x = 4, 10 do
+      for z = 2, 8 do
+        if x == 4 or x == 10 or z == 2 or z == 8 then
+          local corner = (x == 4 or x == 10) and (z == 2 or z == 8)
+          if corner then s:set(x, y, z, trim)
+          elseif (y - 8) % 3 == 2 and y < 25 then s:set(x, y, z, glass)
+          else s:set(x, y, z, wall) end
+        end
+      end
+    end
+  end
+
+  -- the P: 5x7 glowing sign on the shaft's front face, wall backdrop
+  local P = { "XXXX.", "X...X", "X...X", "XXXX.", "X....", "X....", "X...." }
+  for r = 1, #P do
+    for c = 1, 5 do
+      s:set(4 + c, 24 - r, 2, P[r]:sub(c, c) == "X" and glow or wall)
+    end
+  end
+
+  -- head: 11x9 (x 2..12, z 1..9), y 26..30 - overhangs the shaft by 2 on
+  -- every side; floor forms the cantilever underside, sign band glows at 28
+  for y = 26, 30 do
+    for x = 2, 12 do
+      for z = 1, 9 do
+        local edge = x == 2 or x == 12 or z == 1 or z == 9
+        local corner = (x == 2 or x == 12) and (z == 1 or z == 9)
+        local shaftInterior = x >= 5 and x <= 9 and z >= 3 and z <= 7
+        if edge then
+          if corner then s:set(x, y, z, trim)
+          elseif y == 28 then s:set(x, y, z, glow)
+          else s:set(x, y, z, wall) end
+        elseif y == 26 and not shaftInterior then
+          s:set(x, y, z, wall)          -- underside of the overhang
+        elseif y == 30 then
+          s:set(x, y, z, wall)          -- head roof
+        end
+      end
+    end
+  end
+
+  -- rooftop fin: quadratic swoosh along the spine (z=5), rising toward +x
+  -- and curling over the edge; lit at the tip
+  for i = 0, 10 do
+    local hgt = math.floor(7 * (i / 10) ^ 2 + 0.5)
+    for k = 1, hgt do s:set(2 + i, 30 + k, 5, trim) end
+  end
+  s:set(13, 37, 5, glow)
+  s:set(14, 36, 5, trim)
+
+  return s
+end
+
 -- ---- build planner ---------------------------------------------------------
 
 -- Produce placements in a build-safe order: bottom layer first, then up. Within

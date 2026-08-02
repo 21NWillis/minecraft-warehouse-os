@@ -11,6 +11,12 @@ local schematic = require("schematic")
 local builder = require("builder")
 
 local args = { ... }
+-- trailing "plan" = dry run: print the material bill + fuel estimate and exit
+local dryRun = false
+if args[#args] == "plan" then
+  table.remove(args)
+  dryRun = true
+end
 local shape = args[1]
 
 local function usage()
@@ -20,7 +26,9 @@ local function usage()
   print("  floor W D block")
   print("  solid W H D block")
   print("  cylinder R H block")
-  print("  evilhq W H [wall glow spire]   Paperclip Corp HQ")
+  print("  evilhq W H [wall glow spire]   generic evil tower")
+  print("  paperclip [wall trim glass glow]  Paperclip Corp HQ (the Doofenshmirtz special)")
+  print("append 'plan' to any shape for a dry run (materials + fuel, no build)")
 end
 
 local s, block
@@ -46,6 +54,8 @@ elseif shape == "evilhq" then
   if not (w and h) then usage() return end
   -- palette optional: buildrun evilhq 9 20 [wall glow spire]
   s = schematic.evilTower(w, h, { wall = args[4], glow = args[5], spire = args[6] })
+elseif shape == "paperclip" then
+  s = schematic.paperclipHQ({ wall = args[2], trim = args[3], glass = args[4], glow = args[5] })
 else
   usage() return
 end
@@ -58,6 +68,11 @@ for b, n in pairs(mats) do print(("  need %d x %s"):format(n, b)) end
 -- fuel: turtles burn 1 fuel per move. estimate generously and refuel from any
 -- fuel item in the inventory before starting.
 local estMoves = #plan * 3 + s.h * 4
+if dryRun then
+  print(("estimated fuel: ~%d moves"):format(estMoves))
+  print("(plan only - nothing built)")
+  return
+end
 if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < estMoves then
   for slot = 1, 16 do
     turtle.select(slot)

@@ -107,6 +107,27 @@ do
   end)(), "dockRuns=" .. dockRuns)
 end
 
+-- Paperclip Corp HQ: multi-material, cantilevered head, rooftop fin - the
+-- hardest geometry we generate. Exact-match build proves the whole thing.
+do
+  local s = schematic.paperclipHQ()
+  local mock = verify("paperclip HQ", s)
+  local mats = s:materials()
+  local kinds = 0
+  for _ in pairs(mats) do kinds = kinds + 1 end
+  check("paperclip HQ uses 4 materials", kinds == 4, kinds)
+  check("paperclip HQ has a lit P + sign band",
+    (mats["minecraft:sea_lantern"] or 0) >= 40, mats["minecraft:sea_lantern"])
+  -- the head must actually overhang: a solid cell at head-floor level whose
+  -- support column below is air all the way to the base roof
+  local hasOverhang = s:get(2, 26, 5) ~= nil
+  for y = 8, 25 do
+    if s:get(2, y, 5) ~= nil then hasOverhang = false end
+  end
+  check("paperclip HQ head cantilevers past the shaft", hasOverhang)
+  print(("      (HQ: %d blocks, %d turtle moves)"):format(s:count(), mock.moves))
+end
+
 -- big structure: 16x10x16 hollow tower, sanity on scale
 do
   local s = schematic.hollowBox(16, 10, 16, "minecraft:stone", { floor = true, roof = true })
