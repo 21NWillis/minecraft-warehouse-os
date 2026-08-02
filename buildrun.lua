@@ -11,12 +11,15 @@ local schematic = require("schematic")
 local builder = require("builder")
 
 local args = { ... }
--- trailing "plan" = dry run: print the material bill + fuel estimate and exit
-local dryRun = false
-if args[#args] == "plan" then
-  table.remove(args)
-  dryRun = true
+-- trailing flags: "plan" = dry run (bill + fuel, no build); "resume" =
+-- continue a parked partial build of the same shape
+local dryRun, resuming = false, false
+while true do
+  if args[#args] == "plan" then table.remove(args); dryRun = true
+  elseif args[#args] == "resume" then table.remove(args); resuming = true
+  else break end
 end
+local argsline = table.concat(args, " ")
 local shape = args[1]
 
 local function usage()
@@ -97,8 +100,7 @@ end
 -- builder.turtleOps so datacenter.lua shares the exact same machinery.
 local ops = builder.turtleOps()
 
-local start = os.epoch and os.epoch("utc") or 0
-local placed, err = builder.run(plan, ops, function(done, total)
+local function progressCb(done, total)
   if done % 16 == 0 or done == total then
     term.clearLine()
     local _, y = term.getCursorPos()
@@ -109,11 +111,44 @@ local placed, err = builder.run(plan, ops, function(done, total)
       net:beacon()
     end
   end
-end)
+end
+
+-- park file: written when a build stops partway (pose recorded while the
+-- turtle is stationary at its park spot), consumed by `... resume`
+local PARK = ".buildrun_park"
+
+local placed, err, endPose
+if resuming then
+  if not fs.exists(PARK) then
+    print("no parked build here to resume")
+    return
+  end
+  local f = fs.open(PARK, "r")
+  local saved = textutils.unserialize(f.readAll() or "")
+  f.close()
+  if not (saved and saved.pose) or saved.line ~= argsline then
+    print("parked build was: buildrun " .. tostring(saved and saved.line))
+    print("resume with exactly those arguments")
+    return
+  end
+  print("resuming parked build (locating first missing block)...")
+  placed, err, endPose = builder.resume(plan, ops, progressCb, saved.pose)
+else
+  placed, err, endPose = builder.run(plan, ops, progressCb)
+end
 
 print("")
 if err then
+  if endPose then
+    local f = fs.open(PARK, "w")
+    f.write(textutils.serialize({ line = argsline,
+      pose = { x = endPose.x, y = endPose.y, z = endPose.z, f = endPose.f } }))
+    f.close()
+  end
   print(("stopped at %d/%d: %s"):format(placed, #plan, err))
+  print("turtle parked at the origin column. restock (or fill the paired")
+  print("ender chest), then: buildrun " .. argsline .. " resume")
 else
+  if fs.exists(PARK) then fs.delete(PARK) end
   print(("done: %d blocks placed"):format(placed))
 end

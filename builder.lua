@@ -46,40 +46,110 @@ end
 
 -- run a plan. ops must provide: up/down/forward/turnLeft/turnRight ->bool,
 -- placeDown(block)->bool, and ensure(block)->bool (make the named block the
--- selected item, refilling from a dock if needed). onProgress(done,total) opt.
--- Returns placed count, error.
-function builder.run(plan, ops, onProgress)
-  local pose = newPose()
+-- selected item, refilling from a dock if needed). Optional ops.checkDown
+-- (block)->bool makes reruns idempotent. onProgress(done,total) opt.
+-- resume_ = { pose=, from= } continues a plan mid-way from a known pose.
+-- Returns placed count, error, final pose. On both success and error the
+-- turtle parks over the origin column, as low as the built corner allows -
+-- a deterministic spot a resume can trust.
+function builder.run(plan, ops, onProgress, resume_)
+  local pose = resume_ and resume_.pose or newPose()
+  local from = resume_ and resume_.from or 1
   local total = #plan
   local maxY = 0
   for _, p in ipairs(plan) do if p.y > maxY then maxY = p.y end end
-  for i, p in ipairs(plan) do
-    if ops.ensure and not ops.ensure(p.block) then
-      -- out of this material: if a dock is configured, fly home, restock, and
-      -- resume. Lets a 16-slot turtle build structures far larger than its hold.
-      if ops.dock then
-        moveTo(ops, pose, 0, maxY + 2, 0)
-        ops.dock(p.block)
-        if not ops.ensure(p.block) then
-          return i - 1, "dock lacks material: " .. p.block
-        end
-      else
-        return i - 1, "out of material: " .. p.block
-      end
-    end
+  local function park()
+    -- best-effort: rise clear, fly home over the top, settle at the origin
+    -- column (rests on the built corner stack / start marker)
+    moveTo(ops, pose, 0, maxY + 2, 0)
+    while pose.y > 0 and ops.down() do pose.y = pose.y - 1 end
+    return pose
+  end
+  for i = from, total do
+    local p = plan[i]
     -- target hover cell is one above the block we place downward
     if not moveTo(ops, pose, p.x, p.y + 1, p.z) then
-      return i - 1, "navigation blocked near " .. p.x .. "," .. p.y .. "," .. p.z
+      return i - 1, "navigation blocked near " .. p.x .. "," .. p.y .. "," .. p.z, park()
     end
-    if not ops.placeDown(p.block) then
-      return i - 1, "placement failed at " .. p.x .. "," .. p.y .. "," .. p.z
+    -- resumable: if this cell already holds the right block (a rerun after
+    -- running dry or a reboot), skip it - reruns are idempotent.
+    if not (ops.checkDown and ops.checkDown(p.block)) then
+      if ops.ensure and not ops.ensure(p.block) then
+        -- out of this material: if a dock is configured, fly home, restock,
+        -- come back. Lets a 16-slot turtle build far beyond its hold.
+        if ops.dock then
+          moveTo(ops, pose, 0, maxY + 2, 0)
+          ops.dock(p.block)
+          if not ops.ensure(p.block) then
+            return i - 1, "dock lacks material: " .. p.block, park()
+          end
+          if not moveTo(ops, pose, p.x, p.y + 1, p.z) then
+            return i - 1, "navigation blocked returning to " .. p.x .. "," .. p.y .. "," .. p.z, park()
+          end
+        else
+          return i - 1, "out of material: " .. p.block, park()
+        end
+      end
+      if not ops.placeDown(p.block) then
+        return i - 1, "placement failed at " .. p.x .. "," .. p.y .. "," .. p.z, park()
+      end
     end
     if onProgress then onProgress(i, total) end
   end
-  -- return home: rise clear above the whole structure first, then travel back
-  -- over the top (never routing through the blocks we just placed)
-  moveTo(ops, pose, 0, maxY + 2, 0)
-  return total, nil
+  return total, nil, park()
+end
+
+-- Resume a partial build from a KNOWN pose (persisted at park time, or the
+-- datum-frame pose a wrapper like datacenter tracks). Placements are always a
+-- strict prefix of the plan, so the first missing block is found by binary
+-- search with fly-over probes (~12 probes for a 4000-block plan), then the
+-- remainder runs normally with checkDown making revisits idempotent.
+-- Requires ops.checkDown. Returns like builder.run.
+function builder.resume(plan, ops, onProgress, pose)
+  if not ops.checkDown then return 0, "resume requires ops.checkDown" end
+  local maxY = 0
+  for _, p in ipairs(plan) do if p.y > maxY then maxY = p.y end end
+  local function lift()
+    while pose.y < maxY + 2 do
+      if not ops.up() then return false end
+      pose.y = pose.y + 1
+    end
+    return true
+  end
+  if not lift() then return 0, "cannot reach flight level above the build" end
+  local function placedAt(i)
+    local p = plan[i]
+    if not moveTo(ops, pose, p.x, math.max(pose.y, maxY + 2), p.z) then return nil end
+    while pose.y > p.y + 1 do
+      if not ops.down() then
+        -- blocked above the target: later work exists here, so it's placed
+        return lift() and true or nil
+      end
+      pose.y = pose.y - 1
+    end
+    local placed = ops.checkDown(p.block)
+    if not lift() then return nil end
+    return placed
+  end
+  local lo, hi = 1, #plan + 1        -- find the first unplaced entry
+  while lo < hi do
+    local mid = math.floor((lo + hi) / 2)
+    local placed = placedAt(mid)
+    if placed == nil then return 0, "probe blocked - airspace above the build must be clear" end
+    if placed then lo = mid + 1 else hi = mid end
+  end
+  if lo > #plan then                 -- nothing missing; just park
+    moveTo(ops, pose, 0, maxY + 2, 0)
+    while pose.y > 0 and ops.down() do pose.y = pose.y - 1 end
+    return #plan, nil, pose
+  end
+  -- align over the first missing block's column, then continue the plan;
+  -- run()'s vertical-first descent there is clear (nothing above a prefix end)
+  local p = plan[lo]
+  if not moveTo(ops, pose, p.x, math.max(pose.y, maxY + 2), p.z) then
+    return lo - 1, "cannot reach resume point", pose
+  end
+  return builder.run(plan, ops, onProgress, { pose = pose, from = lo })
 end
 
 -- standard in-game ops for builder.run: real turtle moves, slot-scan ensure,
@@ -106,6 +176,10 @@ function builder.turtleOps(opts)
     turnLeft = tracked("turnLeft", function() turtle.turnLeft() return true end),
     turnRight = tracked("turnRight", function() turtle.turnRight() return true end),
     placeDown = function() return turtle.placeDown() end,
+    checkDown = function(want)
+      local ok, info = turtle.inspectDown()
+      return ok and info.name == want
+    end,
     ensure = function(want)
       local cur = turtle.getItemDetail()
       if cur and cur.name == want then return true end

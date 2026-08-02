@@ -87,6 +87,34 @@ do
   check("stops when material runs out", err ~= nil and placed == 10, (placed or "?") .. " / err=" .. tostring(err))
 end
 
+-- resume: a partial build parks at a deterministic pose; builder.resume picks
+-- up from that pose, binary-searches for the first missing block, and
+-- finishes without re-placing anything - restock-and-resume is idempotent
+do
+  local s = schematic.hollowBox(5, 4, 5, "minecraft:stone", { floor = true })
+  local plan = s:plan()
+  local mock = newMock({ ["minecraft:stone"] = 20 })      -- runs dry partway
+  mock.ops.checkDown = function(block)
+    return mock.world[mock.key(mock.x, mock.y - 1, mock.z)] == block
+  end
+  local placed1, err1, pose1 = builder.run(plan, mock.ops)
+  check("partial build stopped", err1 ~= nil and placed1 == 20, tostring(placed1))
+  check("park pose matches the physical turtle", pose1 ~= nil
+    and pose1.x == mock.x and pose1.y == mock.y and pose1.z == mock.z,
+    pose1 and ("%d,%d,%d vs %d,%d,%d"):format(pose1.x, pose1.y, pose1.z, mock.x, mock.y, mock.z))
+  mock.inv["minecraft:stone"] = 999                        -- restock, resume
+  local placed2, err2 = builder.resume(plan, mock.ops, nil, pose1)
+  check("resume completes the partial build", err2 == nil and placed2 == #plan,
+    tostring(placed2) .. "/" .. #plan .. " err=" .. tostring(err2))
+  check("resume placed only the missing blocks", mock.placedCount == s:count(),
+    mock.placedCount .. "/" .. s:count())
+  local mismatch
+  for k, block in pairs(s.cells) do
+    if mock.world[k] ~= block then mismatch = k end
+  end
+  check("resumed world matches schematic", mismatch == nil, mismatch)
+end
+
 -- network-refill: a turtle whose hold is far too small still completes a large
 -- build by docking to restock (ops.dock tops it up, like an ender chest at home)
 do

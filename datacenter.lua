@@ -198,24 +198,39 @@ elseif cmd == "build" then
     return true
   end
 
-  print(("%s: %d blocks; flying out..."):format(site.name, s:count()))
-  -- out: rise to the corridor, over, drop to the builder's start hover cell
-  if not (goTo(pose.x, M.CORRIDOR_Y, pose.z)
-      and goTo(site.at[1], M.CORRIDOR_Y, site.at[3])
-      and goTo(site.at[1], site.at[2] + 1, site.at[3])) then
-    print("travel blocked - is something built in the corridor?")
-    return
-  end
-  face(0)
-
-  local placed, err = builder.run(plan, ops, function(done, total)
+  local resuming = args[3] == "resume"
+  local function progressCb(done, total)
     if done % 32 == 0 or done == total then
       local _, y = term.getCursorPos()
       term.setCursorPos(1, y)
       term.clearLine()
       term.write(("building %d/%d"):format(done, total))
     end
-  end)
+  end
+
+  print(("%s: %d blocks; flying out..."):format(site.name, s:count()))
+  local placed, err
+  if resuming then
+    -- fly to the corridor over the site; builder.resume self-locates the
+    -- first missing block from there (datum pose -> builder frame is a shift)
+    if not (goTo(pose.x, M.CORRIDOR_Y, pose.z)
+        and goTo(site.at[1], M.CORRIDOR_Y, site.at[3])) then
+      print("travel blocked - is something built in the corridor?")
+      return
+    end
+    placed, err = builder.resume(plan, ops, progressCb,
+      { x = 0, y = M.CORRIDOR_Y - site.at[2], z = 0, f = pose.f })
+  else
+    -- out: rise to the corridor, over, drop to the builder's start hover cell
+    if not (goTo(pose.x, M.CORRIDOR_Y, pose.z)
+        and goTo(site.at[1], M.CORRIDOR_Y, site.at[3])
+        and goTo(site.at[1], site.at[2] + 1, site.at[3])) then
+      print("travel blocked - is something built in the corridor?")
+      return
+    end
+    face(0)
+    placed, err = builder.run(plan, ops, progressCb)
+  end
   print("")
 
   -- home: rise to the corridor from wherever the builder left us, fly back
@@ -226,13 +241,13 @@ elseif cmd == "build" then
 
   if err then
     print(("stopped at %d/%d: %s"):format(placed, #plan, err))
-    print("restock and rerun `datacenter build " .. site.key .. "`")
+    print("restock, then: datacenter build " .. site.key .. " resume")
   else
     markBuilt(site.key)
     print(("%s complete: %d blocks placed; back at the portal"):format(site.name, placed))
   end
 
 else
-  print("datacenter map|list|bill <phase|all>|build <phase>")
+  print("datacenter map|list|bill <phase|all>|build <phase> [resume]")
   print("place the turtle ON the void portal facing campus-north first")
 end

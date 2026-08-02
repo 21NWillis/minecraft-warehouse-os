@@ -104,6 +104,40 @@ NOC monitor wall.
 6. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
    for the Java mod when the server adds it, orbital anything.
 
+## Appendix A — zero-to-tower walkthrough (phase 0, exact steps)
+
+From "a chest and some items" to the HQ standing:
+
+1. **Craft the kit**: computer (7 stone ring, redstone center, glass pane
+   bottom-middle) -> turtle (7 iron ring, computer center, chest
+   bottom-middle) -> mining turtle (turtle + diamond pickaxe in a grid).
+   2x EnderStorage ender chests (JEI: the one with colored latches; same
+   colors = shared inventory). ~64 coal. Void portal for later
+   (8 obsidian + ender pearl).
+2. **Materials** (`buildrun paperclip plan` prints this in-game):
+   815 purple concrete (102x powder crafts: 4 sand + 4 gravel + 1 purple dye
+   -> 8 powder; water-convert BEFORE loading - the turtle places exact ids),
+   152 polished blackstone, 219 gray stained glass (8 glass + gray dye -> 8),
+   48 sea lanterns (4 prismarine shards + 5 crystals each). Budget palette if
+   prismarine/purple is annoying: `buildrun paperclip minecraft:purple_terracotta
+   minecraft:polished_blackstone minecraft:gray_stained_glass minecraft:glowstone`.
+3. **Site**: 15 wide x 11 deep flat, 38 of clear sky. Stand at your viewpoint:
+   the P faces you; the turtle goes at the front-LEFT corner facing AWAY.
+4. **Placement**: temp block at that corner, turtle ON TOP facing into the
+   build, break the temp block (turtle floats). Ground floor forms level with
+   where the temp block was.
+5. **Software**: in the turtle: `label set constructor-1`, then
+   `wget https://raw.githubusercontent.com/21NWillis/minecraft-warehouse-os/main/update.lua update`
+   then `update https://raw.githubusercontent.com/21NWillis/minecraft-warehouse-os/main/`.
+6. **Load**: base ender chest at your chest area holding ALL spare stacks;
+   turtle carries: coal, the paired ender chest, 14 slots of materials.
+7. **Launch**: `buildrun paperclip`. ~30-45 min. It self-restocks from the
+   ender chest when dry - your only job is keeping the base chest fed.
+8. **If it stops**: it parks at the origin column and saves its pose. Fix the
+   cause (usually an empty paired chest), then `buildrun paperclip resume` -
+   it locates the first missing block and continues (idempotent, tested).
+9. **Then**: portal in the main room, step through, phase 0.5 of this runbook.
+
 ## Standing rules
 
 - The turtle always launches from the portal, facing campus-north. If a build
