@@ -58,3 +58,4 @@ pipefit.lua
 nocfit.lua
 flight.lua
 peripherals.lua
+nocboard.lua

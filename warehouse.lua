@@ -627,6 +627,12 @@ local function touchLoop()
   end
 end
 
+-- stock-keeper state, declared BEFORE dumpState which reads it (they used to
+-- be declared below, so dumpState closed over an undefined global and
+-- crashed on the first live rescan - found in field, not in mocks)
+local stockTargets = {}    -- item id -> target count
+local stockStatusById = {} -- item id -> last reconcile note ("ok" / reason)
+
 -- write a small state file so the bridge can surface serve metrics to Claude
 local function dumpState()
   local ok, f = pcall(fs.open, "wh_state.txt", "w")
@@ -648,11 +654,33 @@ local function dumpState()
   f.close()
 end
 
+-- broadcast the index over wireless so remote dashboards (NOC `nocboard`,
+-- exchange-style tickers) can see the system without a wired connection
+local function broadcastIndex()
+  if not rednet then return end
+  for _, side in ipairs(peripheral.getNames()) do
+    if peripheral.getType(side) == "modem" and not rednet.isOpen(side) then
+      pcall(rednet.open, side)
+    end
+  end
+  local items = {}
+  for i = 1, math.min(#sorted, 40) do
+    local id = sorted[i]
+    items[#items + 1] = { id = id, count = index[id] and index[id].count or 0 }
+  end
+  local total = 0
+  for _, it in pairs(index) do total = total + (it.count or 0) end
+  pcall(rednet.broadcast,
+    { t = "wh_index", items = items, total = total, distinct = #sorted },
+    "paperclip.wh")
+end
+
 local function rescanLoop()
   while true do
     rescan()
     draw()
     dumpState()
+    broadcastIndex()
     sleep(RESCAN_SECONDS)
   end
 end
@@ -835,8 +863,7 @@ end
 -- -------------------------------------------------------------- auto-stocker
 local STOCK_FILE = "stock.cfg"
 local STOCK_INTERVAL = 60
-local stockTargets = {}   -- item id -> target count
-local stockStatusById = {} -- item id -> last reconcile note ("ok" / reason)
+-- (stockTargets / stockStatusById are declared above dumpState)
 
 local function loadStock()
   stockTargets = {}
