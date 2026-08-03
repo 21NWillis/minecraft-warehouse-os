@@ -224,8 +224,14 @@ long tail:
    channel, and each shard's serpentine/hover/home column stays inside its
    own slab so N turtles never share airspace. Provisioning via the floppy
    drive. Turns hall-scale builds into minutes and mega-builds into possible.
-9. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
-   for the Java mod when the server adds it, orbital anything.
+9. WHEN THE SERVER ADDS Advanced Peripherals + our paperclip mod (planned):
+   ME Bridge = CC reads/writes ME cells directly -> storage doctrine v2
+   (cells primary, barrel-priority dance optional, grid/nocboard/Lens read
+   the whole network); Chat Box = fleet speaks in chat; player detectors for
+   NOC presence; paperclip GPU blocks + cluster primitives come alive
+   (nanolm on hardware). Revisit warehouse.lua storage layer at that gate.
+10. Then the fun roadmap: turbine control, GPS constellation, orbital
+   anything.
 
 ## Appendix A — zero-to-tower walkthrough (phase 0, exact steps)
 
