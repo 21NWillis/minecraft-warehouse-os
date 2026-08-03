@@ -1,7 +1,6 @@
--- Paperclip curation v9: TWO INDEPENDENT TRIGGERS. Field fact: with one
--- trigger, greedy garbage volume starved the store outputs - valuables sat
--- in intake because "we never run out of garbage". Separate triggers each
--- get a full execution every sweep, so garbage can never starve valuables.
+-- Paperclip curation v10: single trigger, VALUABLES FIRST, garbage last.
+-- (v9's split triggers still starved under greedy rock volume in the
+-- field; user-directed ordering fix - store/judge/vault before void/trash.)
 -- Rulings derived from actual loot data (vanilla jar: fishing/fish,
 -- fishing/junk, chests/ancient_city + strainer pools + mod injections).
 -- Anything unlisted waits in intake for a one-line ruling (no catch-all).
@@ -9,14 +8,8 @@
 -- silence trim template id is too long to survive - hence the wildcard).
 -- void = chest pipez-piped into the standalone Matter Condenser (needs no
 -- network/power - field fact); rock overflow dies in trash (relief valve).
--- HARDWARE RULE (field-learned): the intake buffer must be a PLAIN chest -
--- NO stack upgrade. Quantities like 9999 are permission, not capability:
--- SFM skims ~one vanilla stack per slot per sweep, so mega-stack slots
--- drain at a trickle while filling at a firehose - the buffer pins at 100%
--- rock and ingestion starves. Small buffer = fully cleared every sweep.
 NAME "paperclip curation"
 
--- valuables lane
 EVERY 20 TICKS DO
   INPUT 9999 EACH FROM intake
   OUTPUT
@@ -63,11 +56,6 @@ EVERY 20 TICKS DO
     minecraft:music_disc_otherside,
     minecraft:disc_fragment_5
     TO vault
-END
-
--- garbage lane (rock feeds the condenser; overflow + junk die)
-EVERY 20 TICKS DO
-  INPUT 9999 EACH FROM intake
   OUTPUT
     minecraft:stone,
     minecraft:gravel,
