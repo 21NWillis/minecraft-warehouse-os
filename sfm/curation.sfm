@@ -1,45 +1,75 @@
-﻿-- Paperclip curation v5 (field-classified). Labels: intake, store (SS
--- controller), judge (curator buffer), vault (ME Interface), trash.
--- NO CATCH-ALL by design: unmatched items wait in intake for explicit
--- rulings - one line per species, ids from field evidence only.
+﻿-- Paperclip curation v6: EXHAUSTIVE, derived from the actual loot data
+-- (vanilla jar: fishing/fish, fishing/junk, chests/ancient_city + strainer
+-- main/gem pools + known mod injections). Anything not listed is a new mod
+-- injection and waits in intake for a one-line ruling. Short lines: the SFM
+-- editor truncates long ones (field-learned).
+-- Treasures worth knowing you print: enchanted golden apples, xp bottles,
+-- sculk catalysts, SILENCE armor trims.
 NAME "paperclip curation"
 
 EVERY 20 TICKS DO
   INPUT FROM intake
-  OUTPUT minecraft:diamond, minecraft:emerald, minecraft:lapis_lazuli,
-         minecraft:coal, minecraft:stone, minecraft:gravel, minecraft:sand,
-         minecraft:string, minecraft:bone, minecraft:cod, minecraft:salmon,
-         minecraft:tropical_fish, minecraft:pufferfish, minecraft:glow_berries,
-         minecraft:prismarine_shard, minecraft:prismarine_crystals,
-         minecraft:book, minecraft:lily_pad, minecraft:tripwire_hook,
-         minecraft:lead, minecraft:echo_shard,
-         caverns_and_chasms:bejeweled_apple, caverns_and_chasms:bejeweled_pearl
+  OUTPUT
+    minecraft:diamond,
+    minecraft:emerald,
+    minecraft:lapis_lazuli,
+    minecraft:coal,
+    minecraft:stone,
+    minecraft:gravel,
+    minecraft:sand,
+    minecraft:string,
+    minecraft:bone,
+    minecraft:cod,
+    minecraft:salmon,
+    minecraft:tropical_fish,
+    minecraft:pufferfish,
+    minecraft:glow_berries,
+    minecraft:prismarine_shard,
+    minecraft:prismarine_crystals,
+    minecraft:book,
+    minecraft:lily_pad,
+    minecraft:tripwire_hook,
+    minecraft:lead,
+    minecraft:echo_shard,
+    minecraft:bamboo,
+    minecraft:ink_sac,
+    minecraft:leather,
+    minecraft:stick,
+    minecraft:amethyst_shard,
+    minecraft:candle,
+    minecraft:compass,
+    minecraft:enchanted_golden_apple,
+    minecraft:experience_bottle,
+    minecraft:name_tag,
+    minecraft:sculk,
+    minecraft:sculk_catalyst,
+    minecraft:sculk_sensor,
+    minecraft:soul_torch,
+    minecraft:silence_armor_trim_smithing_template,
+    minecraft:ward_armor_trim_smithing_template,
+    caverns_and_chasms:bejeweled_apple,
+    caverns_and_chasms:bejeweled_pearl
     TO store
   OUTPUT minecraft:enchanted_book TO judge
-  OUTPUT minecraft:music_disc_13, minecraft:music_disc_cat,
-         minecraft:music_disc_blocks, minecraft:music_disc_chirp,
-         minecraft:music_disc_far, minecraft:music_disc_mall,
-         minecraft:music_disc_mellohi, minecraft:music_disc_stal,
-         minecraft:music_disc_strad, minecraft:music_disc_ward,
-         minecraft:music_disc_11, minecraft:music_disc_wait,
-         minecraft:music_disc_5, minecraft:music_disc_otherside,
-         minecraft:music_disc_pigstep, minecraft:music_disc_relic,
-         minecraft:music_disc_precipice, minecraft:music_disc_creator,
-         minecraft:music_disc_creator_music_box, minecraft:disc_fragment_5
+  OUTPUT
+    minecraft:music_disc_13,
+    minecraft:music_disc_cat,
+    minecraft:music_disc_otherside,
+    minecraft:disc_fragment_5
     TO vault
-  OUTPUT minecraft:leather_helmet, minecraft:leather_chestplate,
-         minecraft:leather_leggings, minecraft:leather_boots,
-         minecraft:iron_helmet, minecraft:iron_chestplate,
-         minecraft:iron_leggings, minecraft:iron_boots,
-         minecraft:golden_helmet, minecraft:golden_chestplate,
-         minecraft:golden_leggings, minecraft:golden_boots,
-         minecraft:diamond_helmet, minecraft:diamond_chestplate,
-         minecraft:diamond_leggings, minecraft:diamond_boots,
-         minecraft:wooden_hoe, minecraft:stone_hoe, minecraft:iron_hoe,
-         minecraft:golden_hoe, minecraft:diamond_hoe,
-         minecraft:potion, minecraft:splash_potion, minecraft:lingering_potion,
-         minecraft:saddle, minecraft:fishing_rod, minecraft:bow,
-         minecraft:shield, minecraft:bowl,
-         caverns_and_chasms:cowl
+  OUTPUT
+    minecraft:leather_boots,
+    minecraft:iron_leggings,
+    minecraft:diamond_leggings,
+    minecraft:diamond_hoe,
+    minecraft:diamond_horse_armor,
+    minecraft:rotten_flesh,
+    minecraft:potion,
+    minecraft:splash_potion,
+    minecraft:lingering_potion,
+    minecraft:saddle,
+    minecraft:fishing_rod,
+    minecraft:bowl,
+    caverns_and_chasms:cowl
     TO trash
 END
