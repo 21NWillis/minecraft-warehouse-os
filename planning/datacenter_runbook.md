@@ -198,6 +198,12 @@ long tail:
    for Blockheads kitchen (tower or NOC) + Pam's = one-click variety for
    the SoL chart. Tier 3: "agri-deck" campus site - Create harvester rows
    feeding the warehouse; auto-stocker keeps the kitchen + lunchbox full.
+7b. Gigasmelter annex (when smelting demand shows up - glass for builds,
+   quarry ore, food): Create BULK BLASTING trench beside the warehouse -
+   encased fan + lava turns a small channel into a fuel-free conveyor
+   smelter; feed from the warehouse, wash output back in. Schematic-able
+   (future `datacenter` site + fit program). Mekanism smelting factories
+   supersede at power-wing tier.
 8. Sharded construction (shardrun): partition a schematic into disjoint
    x-slabs, one per turtle - fleet.lua leases the slabs (no double-assign,
    dead-worker reclaim), every turtle docks against the same ender-chest
