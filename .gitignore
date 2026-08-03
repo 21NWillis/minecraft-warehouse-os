@@ -4,3 +4,6 @@
 # gradle build output
 paperclip/build/
 paperclip/.gradle/
+
+lens/build/
+lens/.gradle/
