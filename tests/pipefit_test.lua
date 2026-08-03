@@ -108,8 +108,8 @@ check("every lattice pipe sits over a strainer or water cell", (function()
   end
   return true
 end)())
-check("trunk ends beside input barrel #1",
-  world[key(warehouse.at[1] + 2, 0, warehouse.at[3] + 1)] == "pipez:item_pipe")
+check("trunk reaches beside the curator's buffer barrel",
+  world[key(warehouse.at[1] + 4, 0, warehouse.at[3] + 1)] == "pipez:item_pipe")
 check("trunk passes through the doorway",
   world[key(warehouse.at[1], 0, warehouse.at[3] + 6)] == "pipez:item_pipe")
 

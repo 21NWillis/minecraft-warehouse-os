@@ -59,3 +59,4 @@ nocfit.lua
 flight.lua
 peripherals.lua
 nocboard.lua
+curator.lua

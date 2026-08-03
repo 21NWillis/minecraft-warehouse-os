@@ -50,6 +50,14 @@ PLAN[#PLAN + 1] = { 1, 1, 8, CONTROLLER }
 PLAN[#PLAN + 1] = { 1, 1, 9, MODEM }
 PLAN[#PLAN + 1] = { 1, 1, 10, COMPUTER }
 PLAN[#PLAN + 1] = { 1, 2, 10, DRIVE }
+-- curator station: a barrel bridge from the wall out into the room (network
+-- chain), ending above a standalone BUFFER barrel where the pipes dump.
+-- The curator turtle stands on the buffer: keeps -> bridge barrel behind it,
+-- junk -> trash can in front (operator-placed at local 6,2,1).
+PLAN[#PLAN + 1] = { 2, 2, 1, BARREL }  -- bridge (chained to the wall)
+PLAN[#PLAN + 1] = { 3, 2, 1, BARREL }
+PLAN[#PLAN + 1] = { 4, 2, 1, BARREL }  -- the KEEP barrel (curator's back)
+PLAN[#PLAN + 1] = { 5, 1, 1, BARREL }  -- the BUFFER (standalone, pipes feed it)
 
 local function run(t, report)
   local site = campus.site("warehouse")
@@ -113,8 +121,9 @@ local function run(t, report)
 
   local placed = 0
   for i, p in ipairs(PLAN) do
-    -- stand in the aisle (local x=2) beside the target, at its height, facing west
-    local ax, ay, az = D(2, p[2], p[3])
+    -- stand one east of the target, at its height, facing west - covers the
+    -- x=1 wall (from the x=2 aisle) AND the curator station outriggers
+    local ax, ay, az = D(p[1] + 1, p[2], p[3])
     if not goTo(ax, ay, az) then return false, "blocked reaching aisle spot " .. i end
     face(3)
     local occ = t.inspect()
@@ -127,6 +136,8 @@ local function run(t, report)
   end
 
   -- the floppy: face the drive (top of the computer stack) and drop it in
+  -- (rise first: the curator station's bridge row blocks level-1 travel)
+  if not goTo(pose.x, 2, pose.z) then return false, "blocked rising over the station" end
   local ax, ay, az = D(2, 2, 10)
   if not goTo(ax, ay, az) then return false, "blocked reaching the drive" end
   face(3)

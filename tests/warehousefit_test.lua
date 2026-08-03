@@ -26,7 +26,7 @@ loadSite(site)
 loadSite(campus.site("casino"))   -- the frame-check probe must find the deck
 
 local slots = {
-  { name = "sophisticatedstorage:barrel", count = 14 },
+  { name = "sophisticatedstorage:barrel", count = 18 },
   { name = "sophisticatedstorage:controller", count = 1 },
   { name = "computercraft:computer_normal", count = 1 },
   { name = "computercraft:wired_modem_full", count = 1 },

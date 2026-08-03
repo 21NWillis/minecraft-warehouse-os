@@ -92,10 +92,14 @@ local function run(t, report)
   end
   cells[#cells + 1] = { wa[1], 0, wa[3] + 6 }       -- through the doorway (west face)
   cells[#cells + 1] = { wa[1] + 1, 0, wa[3] + 6 }   -- inside, beside the barrel wall
-  for lz = 5, 1, -1 do                              -- down the aisle to input barrel #1
+  for lz = 5, 1, -1 do                              -- down the aisle
     cells[#cells + 1] = { wa[1] + 2, 0, wa[3] + lz }
   end
-  -- final cell (wa+2, 0, wa+1) is side-adjacent to the lower input barrel
+  cells[#cells + 1] = { wa[1] + 3, 0, wa[3] + 1 }   -- out to the curator's
+  cells[#cells + 1] = { wa[1] + 4, 0, wa[3] + 1 }   -- BUFFER barrel (local 5,1,1)
+  -- NOTE: the pipe at (wa+2) also touches the lower input barrel - wrench
+  -- that one connection to DISABLED so everything flows to the buffer and
+  -- the curator decides what deserves to exist
 
   local placed = 0
   for i, cell in ipairs(cells) do
