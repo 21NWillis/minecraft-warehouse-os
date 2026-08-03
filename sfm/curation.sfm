@@ -9,6 +9,11 @@
 -- silence trim template id is too long to survive - hence the wildcard).
 -- void = chest pipez-piped into the standalone Matter Condenser (needs no
 -- network/power - field fact); rock overflow dies in trash (relief valve).
+-- HARDWARE RULE (field-learned): the intake buffer must be a PLAIN chest -
+-- NO stack upgrade. Quantities like 9999 are permission, not capability:
+-- SFM skims ~one vanilla stack per slot per sweep, so mega-stack slots
+-- drain at a trickle while filling at a firehose - the buffer pins at 100%
+-- rock and ingestion starves. Small buffer = fully cleared every sweep.
 NAME "paperclip curation"
 
 -- valuables lane
