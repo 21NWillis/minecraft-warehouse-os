@@ -22,7 +22,9 @@ M.PALETTE = {
   wall = "minecraft:purple_concrete",
   trim = "minecraft:polished_blackstone",
   glass = "minecraft:gray_stained_glass",
-  glow = "minecraft:sea_lantern",
+  -- glowstone to match the HQ's bootstrap palette (no prismarine farming
+  -- yet); swap back to sea_lantern when the ocean monument run happens
+  glow = "minecraft:glowstone",
 }
 local P = M.PALETTE
 
