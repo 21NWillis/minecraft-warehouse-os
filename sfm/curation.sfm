@@ -1,9 +1,7 @@
-﻿-- Paperclip curation v4. Labels: intake (pipe-fed chest), store (SS Storage
--- Controller), judge (curator buffer), vault (ME Interface -> cells), trash.
--- One block, ordered: bulk -> barrels (deep counts, CC-visible economy),
--- books -> the curator, junk -> dead BEFORE it can eat cell types, and the
--- remainder (unknown stackables, the long tail) -> ME cells, whose 63-types
--- budget is spent on exactly the many-kinds/moderate-counts profile.
+﻿-- Paperclip curation v5 (field-classified). Labels: intake, store (SS
+-- controller), judge (curator buffer), vault (ME Interface), trash.
+-- NO CATCH-ALL by design: unmatched items wait in intake for explicit
+-- rulings - one line per species, ids from field evidence only.
 NAME "paperclip curation"
 
 EVERY 20 TICKS DO
@@ -12,25 +10,36 @@ EVERY 20 TICKS DO
          minecraft:coal, minecraft:stone, minecraft:gravel, minecraft:sand,
          minecraft:string, minecraft:bone, minecraft:cod, minecraft:salmon,
          minecraft:tropical_fish, minecraft:pufferfish, minecraft:glow_berries,
-         minecraft:prismarine_shard, minecraft:prismarine_crystals
+         minecraft:prismarine_shard, minecraft:prismarine_crystals,
+         minecraft:book, minecraft:lily_pad, minecraft:tripwire_hook,
+         minecraft:lead, minecraft:echo_shard,
+         caverns_and_chasms:bejeweled_apple, caverns_and_chasms:bejeweled_pearl
     TO store
   OUTPUT minecraft:enchanted_book TO judge
+  OUTPUT minecraft:music_disc_13, minecraft:music_disc_cat,
+         minecraft:music_disc_blocks, minecraft:music_disc_chirp,
+         minecraft:music_disc_far, minecraft:music_disc_mall,
+         minecraft:music_disc_mellohi, minecraft:music_disc_stal,
+         minecraft:music_disc_strad, minecraft:music_disc_ward,
+         minecraft:music_disc_11, minecraft:music_disc_wait,
+         minecraft:music_disc_5, minecraft:music_disc_otherside,
+         minecraft:music_disc_pigstep, minecraft:music_disc_relic,
+         minecraft:music_disc_precipice, minecraft:music_disc_creator,
+         minecraft:music_disc_creator_music_box, minecraft:disc_fragment_5
+    TO vault
   OUTPUT minecraft:leather_helmet, minecraft:leather_chestplate,
          minecraft:leather_leggings, minecraft:leather_boots,
-         minecraft:chainmail_helmet, minecraft:chainmail_chestplate,
-         minecraft:chainmail_leggings, minecraft:chainmail_boots,
          minecraft:iron_helmet, minecraft:iron_chestplate,
          minecraft:iron_leggings, minecraft:iron_boots,
          minecraft:golden_helmet, minecraft:golden_chestplate,
          minecraft:golden_leggings, minecraft:golden_boots,
          minecraft:diamond_helmet, minecraft:diamond_chestplate,
          minecraft:diamond_leggings, minecraft:diamond_boots,
-         minecraft:iron_horse_armor, minecraft:golden_horse_armor,
-         minecraft:diamond_horse_armor, minecraft:saddle,
-         minecraft:fishing_rod, minecraft:bow, minecraft:wooden_sword,
-         minecraft:wooden_pickaxe, minecraft:wooden_axe, minecraft:wooden_shovel,
-         minecraft:stone_sword, minecraft:stone_pickaxe, minecraft:stone_axe,
-         minecraft:stone_shovel, minecraft:shield, minecraft:bowl
+         minecraft:wooden_hoe, minecraft:stone_hoe, minecraft:iron_hoe,
+         minecraft:golden_hoe, minecraft:diamond_hoe,
+         minecraft:potion, minecraft:splash_potion, minecraft:lingering_potion,
+         minecraft:saddle, minecraft:fishing_rod, minecraft:bow,
+         minecraft:shield, minecraft:bowl,
+         caverns_and_chasms:cowl
     TO trash
-  OUTPUT TO vault
 END
