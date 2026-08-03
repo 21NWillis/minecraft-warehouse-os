@@ -11,7 +11,9 @@
 -- greedy mode: add gravel+sand to the void line. Trash can stays trash.
 NAME "paperclip curation"
 
-EVERY 3 TICKS DO
+-- (SFM server floor: minimum trigger interval is 20 ticks - field fact.
+-- Not a bottleneck: each sweep drains intake completely, full stacks.)
+EVERY 20 TICKS DO
   INPUT FROM intake
   OUTPUT
     minecraft:stone,
