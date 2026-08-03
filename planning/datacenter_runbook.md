@@ -132,6 +132,15 @@ live in ME cells (LOW priority, native balancing). One terminal shows both.
 
 ## Phase 7 — ME uplink (the giga system)
 
+> SHIPPED 2026-08-03 (night shift): `quarry.lua` + `quarrylogic.lua` - the
+> JAMD strip-miner for the osmium trip. Headless-proven (38 checks):
+> serpentine 3-tall slices, ore-grab above/below, fuel governor that
+> parks home solvent, junk shed in corridors + keeper hauls to the home
+> chest, multi-layer descent, `quarry resume` from the chest corner.
+> Field ritual: chest at turtle's BACK (`go forward` moves away from it),
+> coal aboard, `quarry 16 16 4` near y0 in JAMD ~= a chunk face of the
+> osmium band.
+
 > PIVOT 2026-08-03 (user decision): NO quantum-bridge merge with the
 > friend's network — Paperclip builds a fully SOVEREIGN ME system and
 > replicates their capabilities over time (mob farm etc.). The void lane
