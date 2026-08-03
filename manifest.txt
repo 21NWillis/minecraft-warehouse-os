@@ -49,3 +49,5 @@ concrete.lua
 provision.lua
 towerstairs.lua
 skyladder.lua
+campus.lua
+casinofit.lua

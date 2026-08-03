@@ -190,10 +190,16 @@ function schematic.hall(w, h, d, palette, opts)
   return s
 end
 
--- strainer deck: watertight underlayer + a lip level with open 2-wide water
--- channels running the full length, 1-wide lit walkways between, and a full
--- perimeter lip (water stays in, you don't walk into the void). Width is
--- derived from the channel count: w = channels*3 + 1.
+-- strainer deck: underlayer + a lip level with open 2-wide water channels,
+-- 1-wide lit walkways between, and a full perimeter lip. Width derives from
+-- the channel count: w = channels*3 + 1.
+--
+-- The fit-out layout is computed HERE and attached as s.meta, so the shell
+-- and the machinery can never disagree: channel z-rows cycle "2 pool rows
+-- every 9" (2x2 infinite water + flow re-sourcing); every other channel row
+-- is a strainer slot with a HOPPER HOLE in the underlayer beneath it (the
+-- holes make every strainer position structurally obvious). casinofit.lua
+-- consumes s.meta; hoppers seal the holes before water is poured.
 function schematic.channelPad(channels, d, palette)
   palette = palette or {}
   local wall = palette.wall or "minecraft:purple_concrete"
@@ -201,9 +207,27 @@ function schematic.channelPad(channels, d, palette)
   local glow = palette.glow or "minecraft:sea_lantern"
   local w = channels * 3 + 1
   local s = schematic.new(w, 2, d)
+
+  s.meta = { strainers = {}, sources = {}, holes = {} }
+  local function isPool(z) return (z - 1) % 9 < 2 end
+  local holeSet = {}
+  for c = 0, channels - 1 do
+    for _, x in ipairs({ 1 + c * 3, 2 + c * 3 }) do
+      for z = 1, d - 2 do
+        if isPool(z) then
+          s.meta.sources[#s.meta.sources + 1] = { x, 1, z }
+        else
+          s.meta.strainers[#s.meta.strainers + 1] = { x, 1, z }
+          s.meta.holes[#s.meta.holes + 1] = { x, 0, z }
+          holeSet[x .. "," .. z] = true
+        end
+      end
+    end
+  end
+
   for x = 0, w - 1 do
     for z = 0, d - 1 do
-      s:set(x, 0, z, wall)
+      if not holeSet[x .. "," .. z] then s:set(x, 0, z, wall) end
       local ix = x - 1
       if x == 0 or x == w - 1 or z == 0 or z == d - 1 then
         s:set(x, 1, z, trim)
