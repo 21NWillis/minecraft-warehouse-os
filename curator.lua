@@ -1,21 +1,38 @@
 -- curator: the fleet's quality-control officer. Stands on the BUFFER barrel
 -- (where the casino pipes dump), pulls everything, and rules on each item:
---   KEEP  -> the bridge barrel behind it (chained into the warehouse grid)
+--   KEEP  -> a network barrel (auto-detected: behind or left of the turtle)
 --   TRASH -> the trash can in front of it (gone forever)
 --
 -- Policy (edit freely - policy as code is the whole point):
---   * stackable items:   KEEP (storage is effectively infinite for them)
---   * unstackable items: TRASH, unless the id matches KEEP_UNSTACKABLE
---     (Apotheosis gems feed the sword program; enchanted books feed the
---      future disenchanter; plain diamond armor is peasant gear - out)
+--   * enchanted books: keep if ANY enchant is level >= BOOK_MIN_LEVEL or
+--     matches BOOK_KEEP_ENCHANTS; trash the level-1 dross. (Apotheosis makes
+--     identical books stack in this pack, so keepers consolidate nicely.)
+--   * other stackables: KEEP (storage is effectively infinite for them)
+--   * unstackables: TRASH unless the id matches KEEP_UNSTACKABLE
+--     (Apoth gems feed the sword program; plain diamond armor is out)
 --
--- Station (warehousefit builds the barrels): curator turtle ON the buffer
--- barrel at warehouse-local (5,1,1), FACING AWAY from the barrel wall.
--- Operator places one Trash Can (trashcans mod) in the block it faces.
-local KEEP_UNSTACKABLE = { "gem", "enchanted_book" }
+-- Setup: turtle ON the buffer barrel FACING THE TRASH CAN, with a network
+-- barrel directly behind it or to its left. Run: curator
+local KEEP_UNSTACKABLE = { "gem" }
+local BOOK_MIN_LEVEL = 3
+local BOOK_KEEP_ENCHANTS = { "mending", "infinity", "silk_touch" }
 local SWEEP_SECONDS = 5
 
+local function bookWorthy(d)
+  local ench = d.enchantments or d.storedEnchantments
+  if not ench then return true end          -- can't read it: keep, don't gamble
+  for _, e in ipairs(ench) do
+    if (e.level or 0) >= BOOK_MIN_LEVEL then return true end
+    local nm = (e.name or ""):lower()
+    for _, want in ipairs(BOOK_KEEP_ENCHANTS) do
+      if nm:find(want, 1, true) then return true end
+    end
+  end
+  return false
+end
+
 local function keepable(d)
+  if d.name:find("enchanted_book", 1, true) then return bookWorthy(d) end
   if (d.maxCount or 1) > 1 then return true end
   for _, pat in ipairs(KEEP_UNSTACKABLE) do
     if d.name:find(pat, 1, true) then return true end
@@ -23,20 +40,36 @@ local function keepable(d)
   return false
 end
 
--- facing: 0 = trash can (as placed), 2 = keep barrel (behind)
+-- facing: 0 = trash can (as placed); minimal-turn facing control
 local facing = 0
 local function face(target)
-  while facing ~= target do
-    turtle.turnLeft()
-    turtle.turnLeft()
-    facing = (facing + 2) % 4
-  end
+  local diff = (target - facing) % 4
+  if diff == 1 then turtle.turnRight()
+  elseif diff == 3 then turtle.turnLeft()
+  elseif diff == 2 then turtle.turnRight() turtle.turnRight() end
+  facing = target
 end
 
-print("curator on duty: stackables + gems + books live, junk dies")
+-- find the keep barrel: behind (2), else left (3)
+local KEEP_FACE = nil
+for _, cand in ipairs({ 2, 3 }) do
+  face(cand)
+  local ok, d = turtle.inspect()
+  if ok and d.name and d.name:find("barrel") then
+    KEEP_FACE = cand
+    break
+  end
+end
+face(0)
+if not KEEP_FACE then
+  print("no keep barrel behind or left of me - build the bridge first")
+  return
+end
+print(("curator on duty (keep side: %s)"):format(KEEP_FACE == 2 and "behind" or "left"))
+print("policy: stackables + gems + good books live, junk and weak books die")
+
 local kept, trashed = 0, 0
 while true do
-  -- pull a batch from the buffer below
   while turtle.suckDown() do
     local full = true
     for slot = 1, 16 do
@@ -45,11 +78,10 @@ while true do
     if full then break end
   end
 
-  -- two passes to minimize spinning: trash first, then keeps
   local stuck = false
   for pass = 1, 2 do
     local wantKeep = pass == 2
-    face(wantKeep and 2 or 0)
+    face(wantKeep and KEEP_FACE or 0)
     for slot = 1, 16 do
       local d = turtle.getItemDetail(slot, true)
       if d and keepable(d) == wantKeep then
@@ -65,9 +97,6 @@ while true do
   face(0)
   if stuck then
     print("!! a destination is full or missing - holding cargo, will retry")
-  end
-  if kept + trashed > 0 and (kept + trashed) % 64 < 8 then
-    print(("kept %d / trashed %d"):format(kept, trashed))
   end
   sleep(SWEEP_SECONDS)
 end
