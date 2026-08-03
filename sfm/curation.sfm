@@ -5,16 +5,20 @@
 -- editor truncates long ones (field-learned).
 -- Treasures worth knowing you print: enchanted golden apples, xp bottles,
 -- sculk catalysts, SILENCE armor trims.
+-- v7: `void` lane (user design) - a chest labeled void, pipez-piped into
+-- the standalone Matter Condenser (it needs no network/power - field fact).
+-- Stone diverted to void as singularity fuel (~5k/hr >> junk volume);
+-- greedy mode: add gravel+sand to the void line. Trash can stays trash.
 NAME "paperclip curation"
 
 EVERY 20 TICKS DO
   INPUT FROM intake
+  OUTPUT minecraft:stone TO void
   OUTPUT
     minecraft:diamond,
     minecraft:emerald,
     minecraft:lapis_lazuli,
     minecraft:coal,
-    minecraft:stone,
     minecraft:gravel,
     minecraft:sand,
     minecraft:string,
@@ -73,3 +77,4 @@ EVERY 20 TICKS DO
     caverns_and_chasms:cowl
     TO trash
 END
+
