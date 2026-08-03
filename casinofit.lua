@@ -78,6 +78,18 @@ local function run(t, report)
   -- datum-frame coords of a casino-local cell
   local function D(c) return at[1] + c[1], at[2] + c[2], at[3] + c[3] end
 
+  -- pre-flight: the first pool primes from TWO simultaneous sources (that's
+  -- what makes it infinite) - refuse to fly without both buckets full
+  local fullBuckets = 0
+  for slot = 1, 16 do
+    local d = t.getItemDetail(slot)
+    if d and d.name == WATER_BUCKET then fullBuckets = fullBuckets + 1 end
+  end
+  if fullBuckets < 2 then
+    return false, "load TWO FULL water buckets (found " .. fullBuckets ..
+      ") - the first pool needs both poured before it can refill itself"
+  end
+
   local placedCount = { hopper = 0, barrel = 0, strainer = 0, source = 0 }
   local skipped = {}
 
@@ -148,10 +160,9 @@ local function run(t, report)
   end
   local function refill()
     if not lastPool then return false end
-    for _ = 1, 2 do
-      if ensure(WATER_BUCKET) then break end       -- already have a full one
-      if not ensure(BUCKET) then return false end
-      local cell = lastPool[#lastPool]             -- scoop a pool corner
+    for _ = 1, 2 do                                 -- top up every empty bucket
+      if not ensure(BUCKET) then break end
+      local cell = lastPool[#lastPool]              -- scoop a pool corner
       local x, y, z = D({ cell[1], cell[2] + 1, cell[3] })
       if not goTo(x, y, z) then return false end
       t.placeDown()                                 -- empty bucket over source = scoop

@@ -51,3 +51,6 @@ towerstairs.lua
 skyladder.lua
 campus.lua
 casinofit.lua
+warehousefit.lua
+courier.lua
+aefab.lua
