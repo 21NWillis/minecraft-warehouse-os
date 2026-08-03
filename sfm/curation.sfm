@@ -1,21 +1,38 @@
--- Paperclip curation, fast lane. Paste into the Factory Manager's GUI.
--- Labels: intake = the chest the pipes fill, store = the Storage Controller,
--- judge = the curator's buffer barrel.
--- LABELING (field-corrected): create labels in the LABEL GUN's own GUI and
--- right-click them onto the blocks directly. Clicking the manager with the
--- gun syncs gun->manager (pull), not the other way - don't rely on it.
--- Order matters: earlier outputs take their matches, the last takes the rest.
+﻿-- Paperclip curation + standing janitor. Paste into the Factory Manager.
+-- Labels: intake (pipe-fed chest), store (Storage Controller), judge
+-- (curator buffer), trash (the trash can). All must be cabled.
+-- Block 1: the fast lane. Block 2: filtered-INPUT janitor - pulls ONLY the
+-- junk list from the whole network, so good items never cycle.
 NAME "paperclip curation"
 
 EVERY 20 TICKS DO
   INPUT FROM intake
-  -- fast lane: known bulk straight into the network
   OUTPUT minecraft:diamond, minecraft:emerald, minecraft:lapis_lazuli,
          minecraft:coal, minecraft:stone, minecraft:gravel, minecraft:sand,
          minecraft:string, minecraft:bone, minecraft:cod, minecraft:salmon,
          minecraft:tropical_fish, minecraft:pufferfish, minecraft:glow_berries,
          minecraft:prismarine_shard, minecraft:prismarine_crystals
     TO store
-  -- the judge's docket: nuance and anything unrecognized
   OUTPUT TO judge
+END
+
+EVERY 20 TICKS DO
+  INPUT minecraft:leather_helmet, minecraft:leather_chestplate,
+        minecraft:leather_leggings, minecraft:leather_boots,
+        minecraft:chainmail_helmet, minecraft:chainmail_chestplate,
+        minecraft:chainmail_leggings, minecraft:chainmail_boots,
+        minecraft:iron_helmet, minecraft:iron_chestplate,
+        minecraft:iron_leggings, minecraft:iron_boots,
+        minecraft:golden_helmet, minecraft:golden_chestplate,
+        minecraft:golden_leggings, minecraft:golden_boots,
+        minecraft:diamond_helmet, minecraft:diamond_chestplate,
+        minecraft:diamond_leggings, minecraft:diamond_boots,
+        minecraft:iron_horse_armor, minecraft:golden_horse_armor,
+        minecraft:diamond_horse_armor, minecraft:saddle,
+        minecraft:fishing_rod, minecraft:bow, minecraft:wooden_sword,
+        minecraft:wooden_pickaxe, minecraft:wooden_axe, minecraft:wooden_shovel,
+        minecraft:stone_sword, minecraft:stone_pickaxe, minecraft:stone_axe,
+        minecraft:stone_shovel, minecraft:shield, minecraft:bowl
+    FROM store
+  OUTPUT TO trash
 END
