@@ -43,6 +43,21 @@ This is, to be clear, completely unhinged for the crafting cost. Even if the
 in-game mechanism is 10x slower than the config suggests, it out-earns
 everything else we run.
 
+## FIELD-VERIFIED (2026-08-02, one timed minute)
+
+Measured: 4 diamonds, 8 emeralds, 6 lapis, 12 glowberries, 22 coal,
+3 bejeweled apples (modded loot injection), enchanted hoe, saddle, XP, junk.
+Gem pool: 18 hits/60 rolls vs 30% modeled - **exactly on prediction**.
+Cadence ~1 roll/sec confirmed. Per strainer-hour: ~240 diamonds,
+~480 emeralds, ~360 lapis, ~140 ancient-city pulls.
+
+**Mechanism (corrected):** place a water SOURCE where it can flow; the
+strainer sits IN the flowing water. Casino channel design: source blocks at
+channel heads, strainers along the flow run (flow reaches 8 from a source -
+re-source every ~8 blocks). Collection: hoppers set into the underlayer
+beneath the channel run. Still open: mesh durability over long runs, and
+whether output is item entities vs internal buffer (affects hopper layout).
+
 ## Verify in-game before scaling (assumptions to test with one strainer)
 
 1. Does every 20-tick cycle actually roll, or is there a hidden chance/water
