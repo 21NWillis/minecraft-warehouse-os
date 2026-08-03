@@ -57,3 +57,4 @@ aefab.lua
 pipefit.lua
 nocfit.lua
 flight.lua
+peripherals.lua
