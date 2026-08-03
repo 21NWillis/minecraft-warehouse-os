@@ -50,19 +50,21 @@ local function face(target)
   facing = target
 end
 
--- find the keep barrel: behind (2), else left (3)
+-- find the keep target: behind (2), else left (3). A storage CONTROLLER is
+-- the best target (it routes deposits network-wide, merging into existing
+-- stacks); a plain barrel also works but holds only its own capacity.
 local KEEP_FACE = nil
 for _, cand in ipairs({ 2, 3 }) do
   face(cand)
   local ok, d = turtle.inspect()
-  if ok and d.name and d.name:find("barrel") then
+  if ok and d.name and (d.name:find("controller") or d.name:find("barrel")) then
     KEEP_FACE = cand
-    break
+    if d.name:find("controller") then break end   -- controller wins outright
   end
 end
 face(0)
 if not KEEP_FACE then
-  print("no keep barrel behind or left of me - build the bridge first")
+  print("no keep barrel/controller behind or left of me - build the bridge first")
   return
 end
 print(("curator on duty (keep side: %s)"):format(KEEP_FACE == 2 and "behind" or "left"))
