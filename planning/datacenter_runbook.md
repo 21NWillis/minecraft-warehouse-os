@@ -164,7 +164,11 @@ long tail:
    Foregoing mob duplicator + crusher off reactor power. Sink: Apotheosis
    enchanting room in the HQ head office, piped from the void.
    Field prep NOW: keep silk touch when found; log spawner coordinates
-   instead of breaking them (enderman/blaze prized).
+   instead of breaking them (enderman/blaze prized); keep every Apotheosis
+   gem + affix drop (salvage fodder for the sword program).
+   6b. Weapons division: Apotheosis sword grind rides the refinery - hyper
+   spawner box doubles as the gem/affix farm + Gateways arena; casino funds
+   reforges; cataclysm boss mats feed it (apothic_cataclysm).
 7. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
    for the Java mod when the server adds it, orbital anything.
 
