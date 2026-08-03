@@ -51,12 +51,13 @@ Gem pool: 18 hits/60 rolls vs 30% modeled - **exactly on prediction**.
 Cadence ~1 roll/sec confirmed. Per strainer-hour: ~240 diamonds,
 ~480 emeralds, ~360 lapis, ~140 ancient-city pulls.
 
-**Mechanism (corrected):** place a water SOURCE where it can flow; the
-strainer sits IN the flowing water. Casino channel design: source blocks at
-channel heads, strainers along the flow run (flow reaches 8 from a source -
-re-source every ~8 blocks). Collection: hoppers set into the underlayer
-beneath the channel run. Still open: mesh durability over long runs, and
-whether output is item entities vs internal buffer (affects hopper layout).
+**Mechanism (FINAL, field-confirmed):** strainers work waterlogged in
+SOURCE blocks - no flow engineering needed at all. Casino channel design:
+fill the trough with water sources, place a strainer in EVERY cell (full
+density, ~38 per channel, ~152 per deck). Strainers are pure inventories
+(catch accumulates inside; no entity spit); collection = the courier turtle
+harvesting each strainer from above via suckDown, with a mesh guard.
+Still open: mesh durability over long runs.
 
 ## Verify in-game before scaling (assumptions to test with one strainer)
 

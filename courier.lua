@@ -77,7 +77,12 @@ local function round()
   -- instead of loot, put it straight back and move to the next one.
   local ca = casino.at
   local hauled = 0
-  for _, cell in ipairs(cs.meta.strainers) do
+  -- field update: strainers work waterlogged in SOURCE blocks, so every
+  -- channel cell (including the old "pool rows") can hold one - sweep all
+  local cells = {}
+  for _, c in ipairs(cs.meta.strainers) do cells[#cells + 1] = c end
+  for _, c in ipairs(cs.meta.sources) do cells[#cells + 1] = c end
+  for _, cell in ipairs(cells) do
     if cargoUsed() >= 14 then break end       -- hold nearly full, go deliver
     local x, y, z = ca[1] + cell[1], ca[2] + cell[2] + 1, ca[3] + cell[3]
     if goTo(x, y, z) then
