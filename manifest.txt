@@ -54,3 +54,5 @@ casinofit.lua
 warehousefit.lua
 courier.lua
 aefab.lua
+pipefit.lua
+nocfit.lua
