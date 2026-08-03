@@ -65,6 +65,16 @@ phase is always: `datacenter bill X` -> stage materials into the turtle (and
 the ender chest for big phases) -> `datacenter build X` -> do the "after"
 fit-out list it printed -> next phase.
 
+> **ORDER REVISION (post-verification):** with the strainer economy field
+> confirmed, the casino jumps the queue: pad -> **casino** (+ hopper/chest
+> plumbing from strainer #1 - loose item entities at battery scale are the
+> performance bomb; bulk storage is part of the build, not an afterthought)
+> -> noc -> warehouse (which the casino's sorting needs make urgent anyway)
+> -> power -> bays. Sky bootstrap is `skyladder` (scaffolding column + gold
+> datum from the anchor corner), then `datacenter build pad` on the same
+> turtle. Strainers only tick in loaded chunks; force-load is a deliberate
+> decision once throughput is seen.
+
 ## Phase 1 — pad (before anything else: it's the floor you'll stand on)
 
 Fits in the turtle's inventory in one load. The portal keeps its center hole.
