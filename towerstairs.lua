@@ -85,6 +85,37 @@ local function run(t, report)
     return false
   end
 
+  -- placement self-check: turtles face their placer, so a player standing
+  -- outside the door produces a perfectly mirrored build OUTSIDE the tower
+  -- (ask me how I know). From the correct spot - doorway center, first cell
+  -- inside, facing the room - the back wall is exactly 8 ahead and the right
+  -- wall exactly 6 to the right. Measure both, fly back, only then build.
+  local function span()
+    local n = 0
+    while n < 12 and not t.detect() and t.forward() do n = n + 1 end
+    -- return the way we came
+    t.turnLeft(); t.turnLeft()
+    for _ = 1, n do
+      if not t.forward() then return nil end
+    end
+    t.turnLeft(); t.turnLeft()
+    return n
+  end
+  local ahead = span()
+  if ahead ~= 8 then
+    return false, ("placement check failed: back wall should be exactly 8 ahead, measured %s. ")
+      :format(tostring(ahead)) ..
+      "Stand INSIDE the room facing the door and place me at the doorway center, first cell inside."
+  end
+  t.turnRight()
+  local right = span()
+  t.turnLeft()
+  if right ~= 6 then
+    return false, ("placement check failed: right wall should be exactly 6 to my right, measured %s. ")
+      :format(tostring(right)) ..
+      "Put me on the doorway's CENTER column, first cell inside."
+  end
+
   for i, p in ipairs(PATH) do
     if not goTo(p[1], p[2] + 1, p[3]) then
       return false, "stuck en route to step " .. i

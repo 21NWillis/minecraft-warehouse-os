@@ -95,6 +95,21 @@ local t = {
   end,
 }
 
+-- regression: a turtle placed facing OUT the door (the mirrored-build
+-- incident) must be refused by the placement self-check, world untouched
+do
+  local saveF, saveX, saveZ = m.f, m.x, m.z
+  m.f = 2                                     -- facing -z, out the door
+  local before = 0
+  for _ in pairs(world) do before = before + 1 end
+  local ok2, err2 = stairs.run(t)
+  local after = 0
+  for _ in pairs(world) do after = after + 1 end
+  check("mirrored placement is refused", not ok2 and tostring(err2):find("placement check") ~= nil, err2)
+  check("refused run changes nothing", before == after and m.placed == 0)
+  m.f, m.x, m.z = saveF, saveX, saveZ         -- back to the correct pose
+end
+
 local ok, err = stairs.run(t)
 check("staircase builds clean in the real tower", ok, err)
 check("placed all 24 steps", m.placed == 24, m.placed)
