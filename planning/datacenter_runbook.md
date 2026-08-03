@@ -188,19 +188,19 @@ long tail:
 ## THE RESOURCE PROGRAM (next session): scale Mekanism like stupid
 
 Field audit (2026-08-03): MA seeds are DISABLED pack-wide (no farm path).
-But EMC prices: osmium ingot 256, redstone 64, diamond ~8192 - and the
-casino prints ~3.8k diamonds/hr (wave 1) = ~31M EMC/hr = ~120k osmium/hr
-equivalent. The casino IS the universal mine; conversion is `transmute`.
-1. Bring `transmute` online on the warehouse computer (controller live,
-   EMC streams - expect a doctor-style first-contact shakeout; report to
-   Claude). Burn diamond/emerald surplus -> EMC bank -> emit osmium/
-   redstone/anything priced, on demand.
-2. Mekanism bootstrap from the emitted stock: metallurgic infuser ->
-   enrichment -> factories -> 4-5x ore processing (multiplies everything
-   else too) -> power wing.
-3. Honest-path backlog: turtle quarry fleet in the JAMD mining dimension
-   (fleet.lua leases + shardrun) for unpriced/mass items; FTB Stuff sluice
-   tables need an in-game JEI check someday. Both deprioritized vs EMC.
+CORRECTION: EMC is bookkeeping only (no ProjectE - nothing converts EMC to
+items; transmute.lua is accounting/crafting, not alchemy). Real acquisition
+paths, ranked:
+1. TURTLE QUARRY FLEET in the JAMD mining dimension - THE plan and the
+   fleet-native one: strip-miner program (port NEUTRON's persistent
+   dead-reckoning nav), fleet.lua lease allocation over columns, ore
+   whitelist filters, ender-chest logistics home. Scales by turtle count.
+2. Multiplication on top: Create crushing (crushed_raw_osmium exists) now,
+   Mekanism 4-5x processing once bootstrapped - every mined ore multiplies.
+3. Sluice line: JEI-check FTB Stuff sluice tables in-game (mesh ore yields
+   may include osmium/redstone - would add a passive feed).
+4. Player economy: casino diamonds/emeralds are server currency - literally
+   BUY osmium from neighbors/friend's ME while the quarry spins up.
 
 ## Bring-up order after construction (systems, not structures)
 
