@@ -1,35 +1,19 @@
-﻿-- Paperclip curation v6: EXHAUSTIVE, derived from the actual loot data
--- (vanilla jar: fishing/fish, fishing/junk, chests/ancient_city + strainer
--- main/gem pools + known mod injections). Anything not listed is a new mod
--- injection and waits in intake for a one-line ruling. Short lines: the SFM
--- editor truncates long ones (field-learned).
--- Treasures worth knowing you print: enchanted golden apples, xp bottles,
--- sculk catalysts, SILENCE armor trims.
--- v7: `void` lane (user design) - a chest labeled void, pipez-piped into
--- the standalone Matter Condenser (it needs no network/power - field fact).
--- Stone diverted to void as singularity fuel (~5k/hr >> junk volume);
--- greedy mode: add gravel+sand to the void line. Trash can stays trash.
+-- Paperclip curation v9: TWO INDEPENDENT TRIGGERS. Field fact: with one
+-- trigger, greedy garbage volume starved the store outputs - valuables sat
+-- in intake because "we never run out of garbage". Separate triggers each
+-- get a full execution every sweep, so garbage can never starve valuables.
+-- Rulings derived from actual loot data (vanilla jar: fishing/fish,
+-- fishing/junk, chests/ancient_city + strainer pools + mod injections).
+-- Anything unlisted waits in intake for a one-line ruling (no catch-all).
+-- Short lines: the SFM editor truncates long ones (field-learned; the
+-- silence trim template id is too long to survive - hence the wildcard).
+-- void = chest pipez-piped into the standalone Matter Condenser (needs no
+-- network/power - field fact); rock overflow dies in trash (relief valve).
 NAME "paperclip curation"
 
--- (SFM server floor: minimum trigger interval is 20 ticks - field fact.
--- Not a bottleneck: each sweep drains intake completely, full stacks.)
+-- valuables lane
 EVERY 20 TICKS DO
-  -- 9999 EACH: default input quantity clogged the intake under emerald
-  -- volume (field fact) - state the appetite explicitly, per item type
   INPUT 9999 EACH FROM intake
-  OUTPUT
-    minecraft:stone,
-    minecraft:gravel,
-    minecraft:sand
-    TO void
-  -- relief valve (ordered outputs: void wins while it has room): the
-  -- condenser pipe is slower than greedy rock income, so overflow rock
-  -- must die in the trash can or it walls the intake shut (field fact)
-  OUTPUT
-    minecraft:stone,
-    minecraft:gravel,
-    minecraft:sand
-    TO trash
   OUTPUT
     minecraft:diamond,
     minecraft:emerald,
@@ -74,7 +58,20 @@ EVERY 20 TICKS DO
     minecraft:music_disc_otherside,
     minecraft:disc_fragment_5
     TO vault
+END
+
+-- garbage lane (rock feeds the condenser; overflow + junk die)
+EVERY 20 TICKS DO
+  INPUT 9999 EACH FROM intake
   OUTPUT
+    minecraft:stone,
+    minecraft:gravel,
+    minecraft:sand
+    TO void
+  OUTPUT
+    minecraft:stone,
+    minecraft:gravel,
+    minecraft:sand,
     minecraft:leather_boots,
     minecraft:iron_leggings,
     minecraft:diamond_leggings,
@@ -90,5 +87,3 @@ EVERY 20 TICKS DO
     caverns_and_chasms:cowl
     TO trash
 END
-
-
