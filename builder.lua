@@ -65,11 +65,14 @@ function builder.run(plan, ops, onProgress, resume_)
     while pose.y > 0 and ops.down() do pose.y = pose.y - 1 end
     return pose
   end
+  local function why()
+    return ops.blockedReason and ops.blockedReason() or "navigation blocked"
+  end
   for i = from, total do
     local p = plan[i]
     -- target hover cell is one above the block we place downward
     if not moveTo(ops, pose, p.x, p.y + 1, p.z) then
-      return i - 1, "navigation blocked near " .. p.x .. "," .. p.y .. "," .. p.z, park()
+      return i - 1, why() .. " near " .. p.x .. "," .. p.y .. "," .. p.z, park()
     end
     -- resumable: if this cell already holds the right block (a rerun after
     -- running dry or a reboot), skip it - reruns are idempotent.
@@ -84,7 +87,7 @@ function builder.run(plan, ops, onProgress, resume_)
             return i - 1, "dock lacks material: " .. p.block, park()
           end
           if not moveTo(ops, pose, p.x, p.y + 1, p.z) then
-            return i - 1, "navigation blocked returning to " .. p.x .. "," .. p.y .. "," .. p.z, park()
+            return i - 1, why() .. " returning to " .. p.x .. "," .. p.y .. "," .. p.z, park()
           end
         else
           return i - 1, "out of material: " .. p.block, park()
@@ -175,6 +178,13 @@ function builder.turtleOps(opts)
     forward = tracked("forward", turtle.forward),
     turnLeft = tracked("turnLeft", function() turtle.turnLeft() return true end),
     turnRight = tracked("turnRight", function() turtle.turnRight() return true end),
+    -- distinguishes "blocked" from "out of fuel" in error reports: both make
+    -- moves fail, and misdiagnosing one as the other wastes real time
+    blockedReason = function()
+      local f = turtle.getFuelLevel()
+      if f ~= "unlimited" and f <= 0 then return "OUT OF FUEL" end
+      return "navigation blocked"
+    end,
     placeDown = function() return turtle.placeDown() end,
     checkDown = function(want)
       local ok, info = turtle.inspectDown()
