@@ -23,6 +23,11 @@ for k, block in pairs(campus.site("pad").gen().cells) do
   local x, y, z = k:match("(-?%d+),(-?%d+),(-?%d+)")
   world[key(tonumber(x) - 8, tonumber(y) - 1, tonumber(z) - 8)] = block
 end
+local cas = campus.site("casino")                 -- frame-check probe target
+for k, block in pairs(cas.gen().cells) do
+  local x, y, z = k:match("(-?%d+),(-?%d+),(-?%d+)")
+  world[key(tonumber(x) + cas.at[1], tonumber(y) + cas.at[2], tonumber(z) + cas.at[3])] = block
+end
 world[key(0, -1, 0)] = "minecraft:gold_block"
 
 local slots = {
@@ -61,6 +66,7 @@ local t = {
     if b then return true, { name = b } end
     return false
   end,
+  detectDown = function() return world[key(m.x, m.y - 1, m.z)] ~= nil end,
   place = function()
     local nx, nz = ahead()
     local k = key(nx, m.y, nz)

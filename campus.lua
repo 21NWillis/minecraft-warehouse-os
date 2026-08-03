@@ -28,8 +28,11 @@ M.SITES = {
     gen = function() return schematic.hall(9, 7, 9, P, { door = "-z" }) end,
     after = { "advanced computer + wireless modem inside; run `update` then `menu`",
               "monitor wall on the interior back wall (max 8x6)" } },
-  { key = "warehouse", name = "Warehouse hall", at = { -28, -1, -6 },
-    gen = function() return schematic.hall(19, 9, 13, P, { door = "+x" }) end,
+  -- FIELD-SURVEYED FRAME (2026-08-02, authoritative): facing campus-north
+  -- from the datum: NOC ahead (+z), casino behind (-z), warehouse to the
+  -- RIGHT (+x). LEFT (-x) is neighbor-claimed - NOTHING builds there.
+  { key = "warehouse", name = "Warehouse hall", at = { 10, -1, -6 },
+    gen = function() return schematic.hall(19, 9, 13, P, { door = "-x" }) end,
     after = { "STORAGE CORE v1: sophisticatedstorage barrels + stack upgrades",
               "  behind sophisticatedstorage:controller (general tier), and a",
               "  functionalstorage drawer wall + its controller (bulk tier)",
@@ -38,12 +41,12 @@ M.SITES = {
               "pipez item pipes: casino barrels -> warehouse input",
               "crafter turtle pool on the west wall; AE2 fronts these same",
               "  storages via storage bus in phase 7 - nothing is throwaway" } },
-  { key = "power", name = "Power wing", at = { 10, -1, -8 },
+  { key = "power", name = "Power wing", at = { 10, -1, 10 },
     gen = function() return schematic.hall(17, 13, 17, P, { door = "-x" }) end,
     after = { "assemble the Mekanism fission reactor multiblock inside",
               "computer on the Logic Adapter running `reactor`",
               "turbine/boiler are a later expansion - leave headroom" } },
-  { key = "bays", name = "Turtle bays", at = { 10, -1, 10 },
+  { key = "bays", name = "Turtle bays", at = { -4, -1, 20 },
     gen = function() return schematic.hall(13, 5, 9, P, { door = "-z" }) end,
     after = { "disk drive + provisioning floppy per bay, fuel + spare-part chests" } },
   { key = "casino", name = "Strainer casino deck", at = { -7, -1, -30 },

@@ -16,10 +16,14 @@ local site = campus.site("warehouse")
 local at = site.at
 local key = function(x, y, z) return x .. "," .. y .. "," .. z end
 local world = {}
-for k, block in pairs(site.gen().cells) do
-  local x, y, z = k:match("(-?%d+),(-?%d+),(-?%d+)")
-  world[key(tonumber(x) + at[1], tonumber(y) + at[2], tonumber(z) + at[3])] = block
+local function loadSite(s)
+  for k, block in pairs(s.gen().cells) do
+    local x, y, z = k:match("(-?%d+),(-?%d+),(-?%d+)")
+    world[key(tonumber(x) + s.at[1], tonumber(y) + s.at[2], tonumber(z) + s.at[3])] = block
+  end
 end
+loadSite(site)
+loadSite(campus.site("casino"))   -- the frame-check probe must find the deck
 
 local slots = {
   { name = "sophisticatedstorage:barrel", count = 14 },
@@ -59,6 +63,7 @@ local t = {
     if b then return true, { name = b } end
     return false
   end,
+  detectDown = function() return world[key(m.x, m.y - 1, m.z)] ~= nil end,
   place = function()
     local nx, nz = ahead()
     local k = key(nx, m.y, nz)

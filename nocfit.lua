@@ -12,6 +12,7 @@
 -- wireless modem onto it by hand (flat modems are a hand job).
 -- Rerun-safe: occupied spots are skipped.
 local campus = require("campus")
+local flight = require("flight")
 
 local MONITOR = "computercraft:monitor_advanced"
 local COMPUTER = "computercraft:computer_advanced"
@@ -73,6 +74,9 @@ local function run(t, report)
     return false
   end
   local function D(x, y, z) return at[1] + x, at[2] + y, at[3] + z end
+
+  local okf, ferr = flight.verifyFrame(t)
+  if not okf then return false, ferr end
 
   -- enter through the door (-z face, center column x4, local y2)
   if not goTo(pose.x, 2, pose.z) then return false, "blocked rising off the datum" end

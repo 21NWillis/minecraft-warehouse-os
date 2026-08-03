@@ -17,6 +17,7 @@
 -- boots, installs, and is ready for `doctor` / `warehouse`.
 -- Rerun-safe: occupied spots are skipped.
 local campus = require("campus")
+local flight = require("flight")
 
 local BARREL = "sophisticatedstorage:barrel"
 local CONTROLLER = "sophisticatedstorage:controller"
@@ -88,10 +89,13 @@ local function run(t, report)
   end
   local function D(x, y, z) return at[1] + x, at[2] + y, at[3] + z end
 
-  -- route: cruise at datum y2 to outside the door (+x side), drop to door
-  -- height, enter through the doorway (local 18, y2, z6), then work the aisle
-  local doorOut = { D(20, 2, 6) }      -- two out from the door, local y2
-  local doorIn = { D(16, 2, 6) }       -- just inside
+  local okf, ferr = flight.verifyFrame(t)
+  if not okf then return false, ferr end
+
+  -- route: cruise at datum y2 to outside the door (-x side, facing the pad),
+  -- enter through the doorway (local 0, y2, z6), then work the aisle
+  local doorOut = { D(-2, 2, 6) }      -- two out from the door, local y2
+  local doorIn = { D(2, 2, 6) }        -- just inside
   if not goTo(pose.x, 2, pose.z) then return false, "blocked rising off the datum" end
   if not goTo(doorOut[1], 2, doorOut[3]) then return false, "blocked reaching the warehouse door" end
   if not goTo(doorIn[1], 2, doorIn[3]) then return false, "blocked entering the doorway" end

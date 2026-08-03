@@ -15,6 +15,7 @@
 -- clicks (insertion is default).
 -- Rerun-safe: cells already piped are skipped.
 local campus = require("campus")
+local flight = require("flight")
 
 local PIPE = "pipez:item_pipe"
 
@@ -64,6 +65,9 @@ local function run(t, report)
     return false
   end
 
+  local okf, ferr = flight.verifyFrame(t)
+  if not okf then return false, ferr end
+
   -- pipe cells in DATUM coords as {x, y, z}, in laying order
   local cells = {}
   for c = 0, 3 do                                   -- lattice over every channel cell (y=1)
@@ -73,22 +77,22 @@ local function run(t, report)
       end
     end
   end
-  for lx = 11, 0, -1 do                             -- header on top of the south lip (y=1)
-    cells[#cells + 1] = { ca[1] + lx, 1, ca[3] }
+  for lx = 0, 12 do                                 -- header on top of the south lip
+    cells[#cells + 1] = { ca[1] + lx, 1, ca[3] }    -- (y=1), ending at the EAST corner
   end
-  -- step-down pair off the deck edge: LOWER first, else the hover cell for
-  -- the lower pipe would be the upper pipe we just placed
-  cells[#cells + 1] = { ca[1] - 1, 0, ca[3] }
-  cells[#cells + 1] = { ca[1] - 1, 1, ca[3] }
-  cells[#cells + 1] = { ca[1] - 2, 0, ca[3] }       -- west to the bypass lane (x = -9)
-  for z = ca[3] + 1, wa[3] + 6 do                   -- north along x=-9, past the pad's west rim
-    cells[#cells + 1] = { ca[1] - 2, 0, z }
+  -- step-down pair off the deck's east edge: LOWER first, else the hover
+  -- cell for the lower pipe would be the upper pipe we just placed
+  cells[#cells + 1] = { ca[1] + 13, 0, ca[3] }
+  cells[#cells + 1] = { ca[1] + 13, 1, ca[3] }
+  for x = ca[1] + 14, 9 do                          -- east to the bypass lane (x=9,
+    cells[#cells + 1] = { x, 0, ca[3] }             -- one off the pad's east rim)
   end
-  cells[#cells + 1] = { wa[1] + 18, 0, wa[3] + 6 }  -- through the warehouse doorway (x=-10)
-  for lx = 17, 2, -1 do                             -- across the hall floor to the barrel wall
-    cells[#cells + 1] = { wa[1] + lx, 0, wa[3] + 6 }
+  for z = ca[3] + 1, wa[3] + 6 do                   -- north along x=9 to door height
+    cells[#cells + 1] = { 9, 0, z }
   end
-  for lz = 5, 1, -1 do                              -- along the wall to input barrel #1
+  cells[#cells + 1] = { wa[1], 0, wa[3] + 6 }       -- through the doorway (west face)
+  cells[#cells + 1] = { wa[1] + 1, 0, wa[3] + 6 }   -- inside, beside the barrel wall
+  for lz = 5, 1, -1 do                              -- down the aisle to input barrel #1
     cells[#cells + 1] = { wa[1] + 2, 0, wa[3] + lz }
   end
   -- final cell (wa+2, 0, wa+1) is side-adjacent to the lower input barrel
@@ -119,8 +123,8 @@ local function run(t, report)
 
   -- home: rise out of the hall through the doorway, back to the datum
   if not goTo(wa[1] + 2, 1, wa[3] + 6) then return false, "blocked leaving the barrel wall" end
-  if not goTo(wa[1] + 18, 1, wa[3] + 6) then return false, "blocked reaching the doorway" end
-  if not goTo(wa[1] + 20, 1, wa[3] + 6) then return false, "blocked exiting the door" end
+  if not goTo(wa[1], 1, wa[3] + 6) then return false, "blocked reaching the doorway" end
+  if not goTo(wa[1] - 2, 1, wa[3] + 6) then return false, "blocked exiting the door" end
   goTo(0, 3, 0)
   goTo(0, 0, 0)
   face(0)

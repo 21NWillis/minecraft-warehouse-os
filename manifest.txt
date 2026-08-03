@@ -56,3 +56,4 @@ courier.lua
 aefab.lua
 pipefit.lua
 nocfit.lua
+flight.lua

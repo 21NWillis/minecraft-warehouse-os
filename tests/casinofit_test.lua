@@ -76,6 +76,7 @@ local t = {
     if b then return true, { name = b } end
     return false
   end,
+  detectDown = function() return world[key(m.x, m.y - 1, m.z)] ~= nil end,
   inspectUp = function()
     local b = world[key(m.x, m.y + 1, m.z)]
     if b then return true, { name = b } end

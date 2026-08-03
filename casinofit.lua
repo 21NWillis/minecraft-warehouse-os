@@ -11,6 +11,7 @@
 -- have), 2 FULL water buckets, ~16 coal. Rerun-safe: done cells are skipped;
 -- rerun with more strainers anytime to grow the battery.
 local campus = require("campus")
+local flight = require("flight")
 
 local SEAL = "minecraft:purple_concrete"
 local HOPPER = "minecraft:hopper"
@@ -76,6 +77,9 @@ local function run(t, report)
   end
   -- datum-frame coords of a casino-local cell
   local function D(c) return at[1] + c[1], at[2] + c[2], at[3] + c[3] end
+
+  local okf, ferr = flight.verifyFrame(t)
+  if not okf then return false, ferr end
 
   -- pre-flight: the first pool primes from TWO simultaneous sources (that's
   -- what makes it infinite) - refuse to fly without both buckets full

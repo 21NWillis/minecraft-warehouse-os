@@ -68,6 +68,7 @@ local t = {
     if b then return true, { name = b } end
     return false
   end,
+  detectDown = function() return world[key(m.x, m.y - 1, m.z)] ~= nil end,
   placeDown = function()
     local it = slots[m.sel]
     local k = key(m.x, m.y - 1, m.z)
@@ -110,7 +111,7 @@ end)())
 check("trunk ends beside input barrel #1",
   world[key(warehouse.at[1] + 2, 0, warehouse.at[3] + 1)] == "pipez:item_pipe")
 check("trunk passes through the doorway",
-  world[key(warehouse.at[1] + 18, 0, warehouse.at[3] + 6)] == "pipez:item_pipe")
+  world[key(warehouse.at[1], 0, warehouse.at[3] + 6)] == "pipez:item_pipe")
 
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
