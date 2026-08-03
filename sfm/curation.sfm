@@ -14,7 +14,9 @@ NAME "paperclip curation"
 -- (SFM server floor: minimum trigger interval is 20 ticks - field fact.
 -- Not a bottleneck: each sweep drains intake completely, full stacks.)
 EVERY 20 TICKS DO
-  INPUT FROM intake
+  -- 9999 EACH: default input quantity clogged the intake under emerald
+  -- volume (field fact) - state the appetite explicitly, per item type
+  INPUT 9999 EACH FROM intake
   OUTPUT
     minecraft:stone,
     minecraft:gravel,
