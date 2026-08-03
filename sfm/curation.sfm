@@ -11,16 +11,18 @@
 -- greedy mode: add gravel+sand to the void line. Trash can stays trash.
 NAME "paperclip curation"
 
-EVERY 20 TICKS DO
+EVERY 3 TICKS DO
   INPUT FROM intake
-  OUTPUT minecraft:stone TO void
+  OUTPUT
+    minecraft:stone,
+    minecraft:gravel,
+    minecraft:sand
+    TO void
   OUTPUT
     minecraft:diamond,
     minecraft:emerald,
     minecraft:lapis_lazuli,
     minecraft:coal,
-    minecraft:gravel,
-    minecraft:sand,
     minecraft:string,
     minecraft:bone,
     minecraft:cod,
@@ -77,4 +79,5 @@ EVERY 20 TICKS DO
     caverns_and_chasms:cowl
     TO trash
 END
+
 
