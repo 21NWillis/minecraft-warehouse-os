@@ -22,6 +22,14 @@ EVERY 20 TICKS DO
     minecraft:gravel,
     minecraft:sand
     TO void
+  -- relief valve (ordered outputs: void wins while it has room): the
+  -- condenser pipe is slower than greedy rock income, so overflow rock
+  -- must die in the trash can or it walls the intake shut (field fact)
+  OUTPUT
+    minecraft:stone,
+    minecraft:gravel,
+    minecraft:sand
+    TO trash
   OUTPUT
     minecraft:diamond,
     minecraft:emerald,
