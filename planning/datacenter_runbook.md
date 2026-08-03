@@ -93,6 +93,39 @@ hold (1 roll/sec, 10% diamond), fit out: water in the channels, strainer
 rows, collection + sorting into the warehouse, and put DIAMONDS/SEC on the
 NOC monitor wall.
 
+## Phase 7 — ME uplink (the giga system)
+
+Architecture: ALL storage/crafting hardware in the void; the tower is a
+terminal lobby. One network, bridged across dimensions:
+
+```
+VOID (warehouse hall)                      OVERWORLD (HQ main room)
+  ME Controller + drive walls                Quantum Ring (far side)
+  autocrafting CPUs + assemblers    <-- Quantum Network Bridge -->
+  Quantum Ring (near side)                   crafting/pattern terminals
+  powered by the reactor wing                 (the "cute little ME system")
+```
+
+Order of operations:
+1. Prereqs: AE2 meteorite for the inscriber presses (compass), certus
+   budding farm, charger/inscriber line in the warehouse hall.
+2. Core in the void warehouse hall: controller, energy acceptors fed from
+   the power wing, drive wall, crafting CPUs. Channels: controller-first
+   design; P2P later if 32 per bridge face gets tight.
+3. Quantum bridge: 2x quantum ring (8 blocks each) + 2 entangled
+   singularities; one ring by the warehouse hall, one in the HQ main room
+   next to the portal. BOTH sides must be chunkloaded: FTB Chunks claims
+   + force-load on the tower chunk and the campus core chunks.
+4. Tower lobby fit-out: terminals on the overworld ring. Pocket access:
+   ae2wtlib Wireless Universal Terminal + quantum card (+ AEInfinityBooster
+   range) = the whole system from anywhere, any dimension.
+5. CC <-> ME handshake: no ME Bridge peripheral in this pack (no Advanced
+   Peripherals), so the warehouse OS talks to ME through ME Interfaces,
+   which look like plain inventories to CC's generic peripheral methods.
+   The CC warehouse keeps running ingest/metrics/strainer-sorting; ME is
+   the human-facing UI layer on the same physical stock. melink.lua was
+   built for exactly this handoff.
+
 ## Bring-up order after construction (systems, not structures)
 
 1. NOC computer: `update`, `menu install`, `profiler tick 60` for a baseline
