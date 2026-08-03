@@ -1,20 +1,19 @@
--- casinofit: installs the casino deck's machinery with the turtle. Run it
--- standing ON the gold datum, facing campus-north, AFTER
--- `datacenter build casino`. Four passes:
---   1. hoppers into the underlayer holes (seals the channel floor)
---   2. collection barrels hung under each hopper, placed from below the deck
---   3. water: 2x2 infinite pools at the pool rows, poured with 2 buckets
+-- casinofit v3: installs the casino deck with the turtle. Strainers are pure
+-- inventories and the COURIER harvests them from above (turtle.suckDown), so
+-- there is NO per-strainer plumbing at all. Run standing ON the gold datum,
+-- facing campus-north, AFTER `datacenter build casino`. Three passes:
+--   1. seal: any leftover hoppers from the old design are dug out and every
+--      underlayer hole is sealed with deck material (watertight again)
+--   2. water: 2x2 infinite pools at the pool rows, poured from 2 buckets
 --      (refills itself from the pools it makes)
---   4. strainers into the flowing water
--- Load: hoppers + barrels + strainers (as many as you have - it fills slots
--- until it runs out and reports what's left), 2 WATER buckets, ~16 coal.
--- Rerun-safe: occupied slots are skipped, so run it again anytime with more
--- machinery to grow the battery. Layout comes from the schematic itself
--- (schematic.channelPad meta) - the holes in the channel floor ARE the map.
+--   3. strainers into the flowing water
+-- Load: ~2 stacks purple concrete (hole sealing), strainers (as many as you
+-- have), 2 FULL water buckets, ~16 coal. Rerun-safe: done cells are skipped;
+-- rerun with more strainers anytime to grow the battery.
 local campus = require("campus")
 
+local SEAL = "minecraft:purple_concrete"
 local HOPPER = "minecraft:hopper"
-local BARREL = "minecraft:barrel"
 local STRAINER = "ftbstuff:oak_water_strainer"
 local WATER_BUCKET = "minecraft:water_bucket"
 local BUCKET = "minecraft:bucket"
@@ -90,10 +89,10 @@ local function run(t, report)
       ") - the first pool needs both poured before it can refill itself"
   end
 
-  local placedCount = { hopper = 0, barrel = 0, strainer = 0, source = 0 }
+  local placedCount = { sealed = 0, recovered = 0, strainer = 0, source = 0 }
   local skipped = {}
 
-  -- ---- pass 1: hoppers, hovering IN the (dry) channel over each hole ----
+  -- ---- pass 1: cleanup + seal - dig out old hoppers, plug every hole ----
   -- runs along each channel column; rises to cruise before switching columns
   -- (walkway tops sit at channel-hover level and would block a direct move)
   if not riseToCruise() then return false, "blocked rising off the datum" end
@@ -104,39 +103,21 @@ local function run(t, report)
     end
     prevX = cell[1]
     local x, y, z = D({ cell[1], cell[2] + 1, cell[3] })   -- hover in channel
-    if not goTo(x, y, z) then return false, "blocked reaching a hopper hole" end
-    local occ = t.inspectDown()
+    if not goTo(x, y, z) then return false, "blocked reaching a hole" end
+    local occ, below = t.inspectDown()
+    if occ and below and below.name == HOPPER then
+      t.digDown()                                  -- recover the old design
+      placedCount.recovered = placedCount.recovered + 1
+      occ = false
+    end
     if not occ then
-      if not ensure(HOPPER) then skipped.hopper = true break end
-      if t.placeDown() then placedCount.hopper = placedCount.hopper + 1 end
+      if not ensure(SEAL) then skipped.seal = true break end
+      if t.placeDown() then placedCount.sealed = placedCount.sealed + 1 end
     end
-    if report then report("hoppers", placedCount.hopper, #meta.holes) end
+    if report then report("sealing", placedCount.sealed, #meta.holes) end
   end
-
-  -- ---- pass 2: barrels, flying under the open deck, placing upward ----
-  -- stage in and out via a corner OUTSIDE the deck footprint: descend in
-  -- open sky, traverse the under-deck plane (clear: barrels sit one above),
-  -- and exit the same way before climbing back
-  if not skipped.hopper then
-    if not riseToCruise() then return false, "blocked leaving the channels" end
-    local sx, sz = at[1] - 2, at[3] - 2
-    local underY = at[2] - 2
-    if not goTo(sx, CRUISE, sz) then return false, "blocked reaching the deck corner" end
-    while pose.y > underY do
-      if not vmove(false) then return false, "blocked descending beside the deck" end
-    end
-    for _, cell in ipairs(meta.holes) do
-      local x, y, z = D({ cell[1], cell[2] - 2, cell[3] })  -- two below the hole
-      if not goTo(x, y, z) then return false, "blocked under the deck" end
-      local occ = t.inspectUp()
-      if not occ then
-        if not ensure(BARREL) then skipped.barrel = true break end
-        if t.placeUp() then placedCount.barrel = placedCount.barrel + 1 end
-      end
-      if report then report("barrels", placedCount.barrel, #meta.holes) end
-    end
-    if not goTo(sx, underY, sz) then return false, "blocked exiting under the deck" end
-    if not riseToCruise() then return false, "blocked climbing beside the deck" end
+  if skipped.seal then
+    return false, "out of " .. SEAL .. " for hole sealing - load ~2 stacks and rerun"
   end
 
   -- ---- pass 3: water, hovering one above the lip level ----
@@ -179,12 +160,18 @@ local function run(t, report)
     -- pour two diagonal-ish cells; a 4-cell group self-completes to 2x2
     local pours = #g >= 4 and { g[1], g[4] } or { g[1], g[2] }
     for _, cell in ipairs(pours) do
-      if not ensure(WATER_BUCKET) and not refill() then
-        return false, "out of water and no infinite pool yet - carry 2 water buckets"
+      -- skip cells that already hold water (rerun over a half-poured deck)
+      local px, py, pz = D({ cell[1], cell[2] + 1, cell[3] })
+      if not goTo(px, py, pz) then return false, "blocked reaching a pool cell" end
+      local occ, below = t.inspectDown()
+      if not (occ and below and below.name:find("water")) then
+        if not ensure(WATER_BUCKET) and not refill() then
+          return false, "out of water and no infinite pool yet - carry 2 water buckets"
+        end
+        local ok = hoverPour(cell, WATER_BUCKET)
+        if ok == false then return false, "blocked reaching a pool cell" end
+        if ok then placedCount.source = placedCount.source + 1 end
       end
-      local ok = hoverPour(cell, WATER_BUCKET)
-      if ok == false then return false, "blocked reaching a pool cell" end
-      if ok then placedCount.source = placedCount.source + 1 end
     end
     if #g >= 4 then lastPool = g end
     refill()
@@ -212,18 +199,18 @@ local M = { run = run }
 if _TEST then return M end
 
 -- ==================================================================== program
-print("casino fit-out: hoppers -> barrels -> water -> strainers")
+print("casino fit-out v3: seal holes -> water -> strainers (courier harvests)")
 local ok, res, skipped = run(turtle, function(pass, n, total)
   if n % 8 == 0 or n == total then print(("%s %d/%d"):format(pass, n, total)) end
 end)
 if ok then
-  print(("installed: %d hoppers, %d barrels, %d sources, %d strainers")
-    :format(res.hopper, res.barrel, res.source, res.strainer))
+  print(("sealed %d holes (recovered %d old hoppers), %d sources, %d strainers")
+    :format(res.sealed, res.recovered, res.source, res.strainer))
   for what in pairs(skipped or {}) do
     print("ran out of " .. what .. "s - rerun with more to grow the battery")
   end
-  print("back on the datum. the casino is live.")
+  print("back on the datum. run the courier to start harvesting.")
 else
   printError("stopped: " .. tostring(res))
-  printError("fix and rerun - finished slots are skipped automatically")
+  printError("fix and rerun - finished cells are skipped automatically")
 end

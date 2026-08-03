@@ -36,9 +36,14 @@ for k, block in pairs(ps.cells) do
 end
 world[key(0, -1, 0)] = "minecraft:gold_block"
 
+-- simulate the half-finished old design: hoppers seated in the first 40 holes
+for i = 1, 40 do
+  local c = s.meta.holes[i]
+  world[key(at[1] + c[1], at[2] + c[2], at[3] + c[3])] = "minecraft:hopper"
+end
+
 local slots = {
-  { name = "minecraft:hopper", count = 112 },
-  { name = "minecraft:barrel", count = 112 },
+  { name = "minecraft:purple_concrete", count = 112 },
   { name = "ftbstuff:oak_water_strainer", count = 112 },
   { name = "minecraft:water_bucket", count = 1 },
   { name = "minecraft:water_bucket", count = 1 },
@@ -106,6 +111,13 @@ local t = {
     world[k] = it.name
     return true
   end,
+  digDown = function()
+    local k = key(m.x, m.y - 1, m.z)
+    if not world[k] then return false end
+    m.recovered = (m.recovered or 0) + 1
+    world[k] = nil
+    return true
+  end,
 }
 
 local ok, res, skipped = fit.run(t)
@@ -117,15 +129,14 @@ check("nothing ran out", skipped ~= nil and next(skipped) == nil,
 
 local wrong = nil
 for _, c in ipairs(s.meta.holes) do
-  if world[key(at[1] + c[1], at[2] + c[2], at[3] + c[3])] ~= "minecraft:hopper" then
-    wrong = "hopper@" .. c[1] .. "," .. c[3]
-  end
-  if world[key(at[1] + c[1], at[2] + c[2] - 1, at[3] + c[3])] ~= "minecraft:barrel" then
-    wrong = wrong or ("barrel@" .. c[1] .. "," .. c[3])
+  if world[key(at[1] + c[1], at[2] + c[2], at[3] + c[3])] ~= "minecraft:purple_concrete" then
+    wrong = "unsealed@" .. c[1] .. "," .. c[3]
   end
 end
-check("all 112 hoppers seated + 112 barrels hung", wrong == nil and
-  res.hopper == 112 and res.barrel == 112, wrong or (res.hopper .. "/" .. res.barrel))
+check("all 112 holes sealed (deck watertight)", wrong == nil and res.sealed == 112,
+  wrong or res.sealed)
+check("old hoppers recovered on the way", res.recovered == 40 and m.recovered == 40,
+  res.recovered .. "/" .. tostring(m.recovered))
 
 wrong = nil
 for _, c in ipairs(s.meta.strainers) do

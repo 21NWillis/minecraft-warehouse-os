@@ -1,6 +1,7 @@
--- courier: fleet logistics turtle. Loops forever: fly under the casino deck,
--- drain every collection barrel, haul the cargo to the warehouse input
--- barrels, repeat. Pipes are for people who don't have a fleet.
+-- courier: fleet logistics turtle. Loops forever: fly the casino channels,
+-- harvest every strainer directly from above (suckDown - they're pure
+-- inventories), haul the cargo to the warehouse input barrels, repeat.
+-- Pipes are for people who don't have a fleet.
 --
 -- Setup: a dedicated turtle (label it courier-1) parked ON the gold datum
 -- facing campus-north, with a stack of coal in slot 1. Run `courier`.
@@ -70,24 +71,37 @@ local function round()
     end
   end
 
-  -- under the casino deck via the outside corner
+  -- harvest every strainer from above: they're pure inventories, and
+  -- turtle.suckDown pulls their catch - no pipes, no hoppers, no config.
+  -- MESH GUARD: if a suck yanks the cloth mesh (the strainer's own part)
+  -- instead of loot, put it straight back and move to the next one.
   local ca = casino.at
-  local underY = ca[2] - 2
-  if not (goTo(ca[1] - 2, 2, ca[3] - 2)) then return false end
-  while pose.y > underY do if not vmove(false) then return false end end
-
   local hauled = 0
-  for _, hole in ipairs(cs.meta.holes) do
+  for _, cell in ipairs(cs.meta.strainers) do
     if cargoUsed() >= 14 then break end       -- hold nearly full, go deliver
-    local x, y, z = ca[1] + hole[1], ca[2] + hole[2] - 2, ca[3] + hole[3]
+    local x, y, z = ca[1] + cell[1], ca[2] + cell[2] + 1, ca[3] + cell[3]
     if goTo(x, y, z) then
-      while turtle.suckUp() do hauled = hauled + 1 end
+      for _ = 1, 27 do
+        local before = {}
+        for s = 2, 16 do before[s] = turtle.getItemCount(s) end
+        if not turtle.suckDown() then break end
+        local gotMesh = false
+        for s = 2, 16 do
+          if turtle.getItemCount(s) > (before[s] or 0) then
+            local d = turtle.getItemDetail(s)
+            if d and d.name:find("mesh") then
+              turtle.select(s)
+              turtle.dropDown()
+              gotMesh = true
+            end
+          end
+        end
+        turtle.select(2)
+        if gotMesh then break end     -- only its mesh left; next strainer
+        hauled = hauled + 1
+      end
     end
   end
-
-  -- exit under-deck the way we came, then to the warehouse door
-  if not goTo(ca[1] - 2, underY, ca[3] - 2) then return false end
-  while pose.y < 2 do if not vmove(true) then return false end end
 
   local wa = warehouse.at
   if not goTo(wa[1] + 20, 2, wa[3] + 6) then return false end
