@@ -153,8 +153,11 @@ local ok, res = run(turtle, function(i, n)
 end)
 if ok then
   print(("storage core installed (%d new blocks). Back on the datum."):format(res))
-  print("YOUR one job: right-click the warehouse computer to power it on.")
-  print("It will disk-boot, self-install, and be ready for `doctor`.")
+  print("YOUR two jobs:")
+  print(" 1. RIGHT-CLICK THE WIRED MODEM until its band glows red (it does")
+  print("    NOT attach the controller until clicked - field-learned)")
+  print(" 2. right-click the computer to power it on (disk-boots + installs)")
+  print("Then `doctor` should show the controller. ")
 else
   printError("stopped: " .. tostring(res))
   printError("fix and rerun - finished placements are skipped")
