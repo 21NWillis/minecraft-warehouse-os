@@ -207,8 +207,27 @@ function builder.turtleOps(opts)
         turtle.suckUp(64)
       end
     end
+    -- reclaim safely: restocking may have filled EVERY slot (including the
+    -- chest's own, via overflow) - digging the chest into a full inventory
+    -- drops it on the ground to despawn. Guarantee a home for it first.
     turtle.select(chestSlot)
+    if turtle.getItemCount(chestSlot) > 0 then
+      turtle.dropUp()                       -- give one stack back to the chest
+    end
+    if turtle.getItemCount(chestSlot) > 0 then
+      -- still jammed: leave the chest mounted rather than lose it
+      print("!! inventory jammed; ender chest left placed above home spot")
+      return
+    end
     turtle.digUp()
+    local back = false
+    for slot = 1, 16 do
+      local d = turtle.getItemDetail(slot)
+      if d and d.name == ECHEST then back = true break end
+    end
+    if not back then
+      print("!! ender chest not reclaimed - check on/above the home column")
+    end
   end
   return ops
 end

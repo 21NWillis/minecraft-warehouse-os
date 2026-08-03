@@ -47,3 +47,4 @@ reactor.lua
 datacenter.lua
 concrete.lua
 provision.lua
+towerstairs.lua
