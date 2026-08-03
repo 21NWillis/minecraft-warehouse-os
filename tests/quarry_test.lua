@@ -122,6 +122,8 @@ check("raw osmium is keeper", q.isKeeper("mekanism:raw_osmium"))
 check("cobblestone is junk", not q.isKeeper("minecraft:cobblestone"))
 check("deepslate is junk", not q.isKeeper("minecraft:deepslate"))
 check("fluorite is keeper", q.isKeeper("mekanism:fluorite_ore"))
+check("prosperity shard is keeper", q.isKeeper("mysticalagriculture:prosperity_shard"))
+check("inferium essence is keeper", q.isKeeper("mysticalagriculture:inferium_essence"))
 
 -- serpentine path: right cell count, no diagonal jumps, starts at origin
 local cells = q.path(4, 6)

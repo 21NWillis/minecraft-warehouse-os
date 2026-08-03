@@ -29,6 +29,7 @@ q.DEFAULT_KEEP = {
   "osmium", "redstone", "diamond", "coal", "iron", "gold", "copper",
   "lapis", "emerald", "uranium", "fluorite", "tin", "lead", "silver",
   "zinc", "nickel", "quartz", "glowstone", "ancient_debris", "raw_",
+  "prosperity", "inferium",  -- Mystical Agriculture seed bootstrap mats
 }
 
 function q.isOre(name)
