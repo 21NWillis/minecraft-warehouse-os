@@ -63,3 +63,6 @@ curator.lua
 sfm/curation.sfm
 quarrylogic.lua
 quarry.lua
+surveylogic.lua
+survey.lua
+surveyd.lua
