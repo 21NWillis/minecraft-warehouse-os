@@ -106,8 +106,10 @@ local function run(t, report)
   local doorOut = { D(-2, 2, 6) }      -- two out from the door, local y2
   local doorIn = { D(2, 2, 6) }        -- just inside
   if not goTo(pose.x, 2, pose.z) then return false, "blocked rising off the datum" end
-  if not goTo(doorOut[1], 2, doorOut[3]) then return false, "blocked reaching the warehouse door" end
-  if not goTo(doorIn[1], 2, doorIn[3]) then return false, "blocked entering the doorway" end
+  -- transit the doorway at datum y1 (the MIDDLE row): the barrel lintel
+  -- occupies the top row of the opening on the inside
+  if not goTo(doorOut[1], 1, doorOut[3]) then return false, "blocked reaching the warehouse door" end
+  if not goTo(doorIn[1], 1, doorIn[3]) then return false, "blocked entering the doorway" end
 
   local placed = 0
   for i, p in ipairs(PLAN) do
@@ -133,8 +135,8 @@ local function run(t, report)
   end
 
   -- home: back out the door, up, and return to the datum
-  if not goTo(doorIn[1], 2, doorIn[3]) then return false, "blocked leaving the aisle" end
-  if not goTo(doorOut[1], 2, doorOut[3]) then return false, "blocked exiting the door" end
+  if not goTo(doorIn[1], 1, doorIn[3]) then return false, "blocked leaving the aisle" end
+  if not goTo(doorOut[1], 1, doorOut[3]) then return false, "blocked exiting the door" end
   if not goTo(0, 2, 0) then return false, "blocked flying home" end
   goTo(0, 0, 0)
   face(0)
