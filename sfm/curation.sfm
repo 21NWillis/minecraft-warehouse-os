@@ -1,6 +1,10 @@
--- Paperclip curation v10: single trigger, VALUABLES FIRST, garbage last.
--- (v9's split triggers still starved under greedy rock volume in the
--- field; user-directed ordering fix - store/judge/vault before void/trash.)
+-- Paperclip curation v10: single trigger, valuables first, garbage last.
+-- HARDWARE RULE (bisect-proven 2026-08-03): the `store` label must sit on
+-- a plain BARREL of the SS network, NOT the controller - the controller
+-- silently refuses SFM automation inserts (hand-inserts via GUI still
+-- work, which masks it). Emerald->vault moved, emerald->store did not;
+-- every "starvation" symptom since v7 was this. Multiple barrels may
+-- share the store label (SFM spills to the next when one fills).
 -- Rulings derived from actual loot data (vanilla jar: fishing/fish,
 -- fishing/junk, chests/ancient_city + strainer pools + mod injections).
 -- Anything unlisted waits in intake for a one-line ruling (no catch-all).
