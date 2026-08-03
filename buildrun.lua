@@ -29,6 +29,7 @@ local function usage()
   print("  floor W D block")
   print("  solid W H D block")
   print("  cylinder R H block")
+  print("  pad W D [wall trim glow]   lit platform (trim rim, glow grid)")
   print("  evilhq W H [wall glow spire]   generic evil tower")
   print("  paperclip [wall trim glass glow]  Paperclip Corp HQ (the Doofenshmirtz special)")
   print("append 'plan' to any shape for a dry run (materials + fuel, no build)")
@@ -57,6 +58,10 @@ elseif shape == "evilhq" then
   if not (w and h) then usage() return end
   -- palette optional: buildrun evilhq 9 20 [wall glow spire]
   s = schematic.evilTower(w, h, { wall = args[4], glow = args[5], spire = args[6] })
+elseif shape == "pad" then
+  local w, d = tonumber(args[2]), tonumber(args[3])
+  if not (w and d) then usage() return end
+  s = schematic.pad(w, d, { wall = args[4], trim = args[5], glow = args[6] })
 elseif shape == "paperclip" then
   s = schematic.paperclipHQ({ wall = args[2], trim = args[3], glass = args[4], glow = args[5] })
 else
