@@ -1,6 +1,9 @@
 -- Paperclip curation, fast lane. Paste into the Factory Manager's GUI.
--- Labels (apply with the SFM label gun): intake = the chest the pipes fill,
--- store = the Storage Controller block, judge = the curator's buffer barrel.
+-- Labels: intake = the chest the pipes fill, store = the Storage Controller,
+-- judge = the curator's buffer barrel.
+-- LABELING (field-corrected): create labels in the LABEL GUN's own GUI and
+-- right-click them onto the blocks directly. Clicking the manager with the
+-- gun syncs gun->manager (pull), not the other way - don't rely on it.
 -- Order matters: earlier outputs take their matches, the last takes the rest.
 NAME "paperclip curation"
 
