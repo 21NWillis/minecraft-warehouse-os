@@ -121,16 +121,33 @@ local function collect(output, timeout)
   return false
 end
 
---- nuclear recovery: dig the inscriber (contents pop aboard), re-place it
+--- recovery ladder: (1) gently suck from every face, (2) dig + re-place
+--- (contents pop aboard), (3) hand off to the operator (no pickaxe / claim
+--- protection blocks digging - confirmed possible at allied bases).
 local function recoverAll()
-  if not ensure("ae2:inscriber") then
-    -- not holding one: dig the block in front
-    if not turtle.dig() then return false, "cannot dig the inscriber" end
-    sleep(0.2)
+  turtle.suck()
+  if toTop() then turtle.suckDown() fromTop() end
+  if toBottom() then turtle.suckUp() fromBottom() end
+  local l = listInsc()
+  local empty = true
+  if l then
+    for _ in pairs(l) do empty = false break end
   end
-  if not ensure("ae2:inscriber") then return false, "inscriber item not in my inventory after digging" end
-  if not turtle.place() then return false, "cannot re-place the inscriber" end
-  sleep(0.2)
+  if empty then return true end
+
+  if turtle.dig() then
+    sleep(0.2)
+    if ensure("ae2:inscriber") and turtle.place() then
+      sleep(0.2)
+      return true
+    end
+    return false, "dug the inscriber but could not re-place it (it's in my inventory)"
+  end
+
+  print(">> can't extract or dig (no pickaxe, or claim protection).")
+  print(">> open the inscriber, take EVERYTHING out by hand,")
+  print(">> then press Enter here to continue.")
+  read()
   return true
 end
 
