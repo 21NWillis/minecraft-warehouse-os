@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '1.0.21'
+}
+
+version = '0.1.0'
+group = 'dev.nwillis.lens'
+base.archivesName = 'paperclip-lens'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    version = '21.1.95'
+
+    runs {
+        client {
+            client()
+        }
+    }
+
+    mods {
+        paperclip_lens {
+            sourceSet sourceSets.main
+        }
+    }
+}
