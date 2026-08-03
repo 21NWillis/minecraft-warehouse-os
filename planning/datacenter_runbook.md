@@ -132,6 +132,17 @@ live in ME cells (LOW priority, native balancing). One terminal shows both.
 
 ## Phase 7 — ME uplink (the giga system)
 
+> PIVOT 2026-08-03 (user decision): NO quantum-bridge merge with the
+> friend's network — Paperclip builds a fully SOVEREIGN ME system and
+> replicates their capabilities over time (mob farm etc.). The void lane
+> keeps feeding the Matter Condenser regardless (first singularity hit 25%
+> within hours of greedy mode) — singularities stockpile as a zero-cost
+> option if a link is ever wanted later. Note also: this phase's
+> campus<->tower bridge predates the sky-campus pivot; campus is now
+> OVERWORLD ~200 blocks above the tower, so the internal link can be a
+> dense-cable riser or just wireless terminals — the quantum bridge here
+> is optional, not required.
+
 Architecture: ALL storage/crafting hardware in the void; the tower is a
 terminal lobby. One network, bridged across dimensions:
 
