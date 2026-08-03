@@ -13,10 +13,11 @@ local builder = require("builder")
 local args = { ... }
 -- trailing flags: "plan" = dry run (bill + fuel, no build); "resume" =
 -- continue a parked partial build of the same shape
-local dryRun, resuming = false, false
+local dryRun, resuming, anchored = false, false, false
 while true do
   if args[#args] == "plan" then table.remove(args); dryRun = true
   elseif args[#args] == "resume" then table.remove(args); resuming = true
+  elseif args[#args] == "anchor" then table.remove(args); anchored = true; resuming = true
   else break end
 end
 local argsline = table.concat(args, " ")
@@ -123,9 +124,17 @@ end
 local PARK = ".buildrun_park"
 
 local placed, err, endPose
-if resuming then
+if anchored then
+  -- pose-free resume: trusts a physical convention instead of saved state.
+  -- Requires the turtle to be sitting ON TOP of the origin-column's highest
+  -- block (the roofline corner where the build started), facing the
+  -- original build direction.
+  local pose = builder.anchorPose(plan)
+  print(("anchor resume: assuming I'm at the origin column top (y=%d), facing the build"):format(pose.y))
+  placed, err, endPose = builder.resume(plan, ops, progressCb, pose)
+elseif resuming then
   if not fs.exists(PARK) then
-    print("no parked build here to resume")
+    print("no parked build here to resume (try `... resume anchor`)")
     return
   end
   local f = fs.open(PARK, "r")
@@ -151,8 +160,14 @@ if err then
     f.close()
   end
   print(("stopped at %d/%d: %s"):format(placed, #plan, err))
-  print("turtle parked at the origin column. restock (or fill the paired")
-  print("ender chest), then: buildrun " .. argsline .. " resume")
+  if endPose and endPose.x == 0 and endPose.z == 0 then
+    print("turtle parked at the origin column. restock (or fill the paired")
+    print("ender chest), then: buildrun " .. argsline .. " resume")
+  elseif endPose then
+    print(("could NOT fly home - parked at %d right, %d fwd, %d up of origin.")
+      :format(endPose.x, endPose.z, endPose.y))
+    print("something blocks the sky path; clear it, then: buildrun " .. argsline .. " resume")
+  end
 else
   if fs.exists(PARK) then fs.delete(PARK) end
   print(("done: %d blocks placed"):format(placed))

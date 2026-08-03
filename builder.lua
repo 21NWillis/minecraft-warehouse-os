@@ -232,5 +232,18 @@ function builder.turtleOps(opts)
   return ops
 end
 
+-- Anchor pose for a pose-free resume: the turtle is physically placed ON TOP
+-- of the origin column's highest planned block (for a tower: on the roofline
+-- corner where the build started), facing the original build direction.
+-- Only valid once the origin column is fully built (i.e. the stop happened
+-- after the base topped out) - true for any failure above the first layers.
+function builder.anchorPose(plan)
+  local top = -1
+  for _, p in ipairs(plan) do
+    if p.x == 0 and p.z == 0 and p.y > top then top = p.y end
+  end
+  return { x = 0, y = top + 1, z = 0, f = 0 }
+end
+
 builder._internal = { moveTo = moveTo, newPose = newPose, DIRS = DIRS }
 return builder

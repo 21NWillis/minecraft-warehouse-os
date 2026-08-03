@@ -156,6 +156,33 @@ do
   print(("      (HQ: %d blocks, %d turtle moves)"):format(s:count(), mock.moves))
 end
 
+-- anchor resume: no saved pose at all - the turtle is physically re-placed
+-- on top of the origin column and resume runs from builder.anchorPose
+do
+  local s = schematic.hollowBox(5, 4, 5, "minecraft:stone", { floor = true })
+  local plan = s:plan()
+  local mock = newMock({ ["minecraft:stone"] = 68 })      -- dies 5 short
+  mock.ops.checkDown = function(block)
+    return mock.world[mock.key(mock.x, mock.y - 1, mock.z)] == block
+  end
+  local placed1 = builder.run(plan, mock.ops)
+  check("anchor scenario: died near the end", placed1 == 68, placed1)
+  local anchor = builder.anchorPose(plan)
+  check("anchor pose tops the origin column", anchor.y == 4, anchor.y)
+  -- simulate the player placing the turtle at the anchor spot
+  mock.x, mock.y, mock.z, mock.f = anchor.x, anchor.y, anchor.z, anchor.f
+  mock.inv["minecraft:stone"] = 99
+  local placed2, err2 = builder.resume(plan, mock.ops, nil,
+    { x = anchor.x, y = anchor.y, z = anchor.z, f = anchor.f })
+  check("anchor resume completes", err2 == nil and placed2 == #plan,
+    tostring(placed2) .. "/" .. #plan .. " err=" .. tostring(err2))
+  local mismatch
+  for k, block in pairs(s.cells) do
+    if mock.world[k] ~= block then mismatch = k end
+  end
+  check("anchor-resumed world matches schematic", mismatch == nil, mismatch)
+end
+
 -- big structure: 16x10x16 hollow tower, sanity on scale
 do
   local s = schematic.hollowBox(16, 10, 16, "minecraft:stone", { floor = true, roof = true })
