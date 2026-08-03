@@ -1,10 +1,23 @@
 # Paperclip datacenter — build runbook
 
-The whole base hangs off **one block**: a Void Portal (`javd:portal_block`) in
-the HQ's main room. The void side is the campus; every structure is built by
-`datacenter build <phase>` from a turtle standing on the portal. This document
-is the order of operations; the live checklists are `datacenter bill <phase>`
-in-game (same numbers, computed from the same generators).
+> **SITE CHANGE (2026-08-02):** the void dimension is claimed by another
+> player (JAVD links to their spot). The campus is now a SKY CAMPUS ~200
+> blocks directly above the HQ tower, same coordinate frame as every build.
+> Nothing in the campus code changes: the datum is simply a placed block
+> (a gold block) instead of the portal. Bootstrap: turtle on the original
+> pedestal corner facing into the tower -> `go up 200` -> place gold block
+> down -> it's standing on the datum -> `datacenter build pad` (the datum
+> sits in the pad's center hole, as the portal would have).
+> Access: scaffold up once, `/sethome campus` (FTB Essentials), hypertube
+> later. Protection/chunkloading: FTB Chunks claims are column-wide - one
+> claim covers tower AND campus; force-load for offline operation. Height
+> check: ground ~y70 puts the corridor ~y285, under the y320 cap.
+
+The whole base hangs off **one block**: the datum the turtle stands on.
+Every structure is built by `datacenter build <phase>` from a turtle on that
+block. This document is the order of operations; the live checklists are
+`datacenter bill <phase>` in-game (same numbers, computed from the same
+generators).
 
 All numbers below are exact (generated headless from the schematics), fuel
 estimates are generous. Coal = 80 moves each.
