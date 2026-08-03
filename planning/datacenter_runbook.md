@@ -156,7 +156,16 @@ long tail:
 3. Reactor commissioning (above). Power routing to the campus.
 4. Strainer verification -> casino fit-out.
 5. Fleet: provision worker turtles in the bays; harvest/fleet programs.
-6. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
+6. XP refinery (future campus site, near the casino): Apothic hyper-spawner
+   (silk-touched enderman/blaze spawner + sugar/clock/comparator upgrades)
+   -> Mob Grinding Utils fans + mashers -> absorption hoppers -> fluid XP.
+   Storage via EnderIO XP Obelisk; Create: Enchantment Industry disenchants
+   the casino's ancient-city loot into the same tanks. Endgame: Industrial
+   Foregoing mob duplicator + crusher off reactor power. Sink: Apotheosis
+   enchanting room in the HQ head office, piped from the void.
+   Field prep NOW: keep silk touch when found; log spawner coordinates
+   instead of breaking them (enderman/blaze prized).
+7. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
    for the Java mod when the server adds it, orbital anything.
 
 ## Appendix A — zero-to-tower walkthrough (phase 0, exact steps)
