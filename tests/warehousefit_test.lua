@@ -97,6 +97,12 @@ for i, p in ipairs(wfit.PLAN) do
   end
 end
 check("every core block on plan (" .. #wfit.PLAN .. ")", wrong == nil, wrong)
+check("nothing blocks the doorway walk cells", (function()
+  for _, p in ipairs(wfit.PLAN) do
+    if p[3] >= 5 and p[3] <= 7 and p[2] <= 2 then return false end
+  end
+  return true
+end)())
 check("floppy inserted into the drive", m.dropped == "computercraft:disk", m.dropped)
 check("materials exactly consumed", (function()
   for _, it in ipairs(slots) do if it.count > 0 then return false end end

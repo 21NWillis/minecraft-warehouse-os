@@ -30,13 +30,22 @@ local FLOPPY = "computercraft:disk"
 -- wall, placed from the aisle at x=2 facing west (so fronts face the room).
 -- Chain contiguity: input barrels(z1) - barrels(z2..7) - controller(z8) -
 -- modem(z9) - computer(z10); drive above the computer.
+-- NOTE: the hall's DOORWAY sits behind local z5..7 on this wall, so those
+-- columns carry a BARREL LINTEL at y3 only - you walk under it, and it
+-- bridges the storage chain over the door to the controller column.
 local PLAN = {
   { 1, 1, 1, BARREL, "input" }, { 1, 2, 1, BARREL, "input" },
+  { 1, 3, 1, BARREL },
 }
-for z = 2, 7 do
+for z = 2, 4 do
   PLAN[#PLAN + 1] = { 1, 1, z, BARREL }
   PLAN[#PLAN + 1] = { 1, 2, z, BARREL }
 end
+for z = 5, 7 do                        -- lintel over the doorway
+  PLAN[#PLAN + 1] = { 1, 3, z, BARREL }
+end
+PLAN[#PLAN + 1] = { 1, 3, 8, BARREL }  -- riser: lintel down to the controller
+PLAN[#PLAN + 1] = { 1, 2, 8, BARREL }
 PLAN[#PLAN + 1] = { 1, 1, 8, CONTROLLER }
 PLAN[#PLAN + 1] = { 1, 1, 9, MODEM }
 PLAN[#PLAN + 1] = { 1, 1, 10, COMPUTER }
