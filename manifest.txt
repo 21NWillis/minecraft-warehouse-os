@@ -60,3 +60,4 @@ flight.lua
 peripherals.lua
 nocboard.lua
 curator.lua
+sfm/curation.sfm

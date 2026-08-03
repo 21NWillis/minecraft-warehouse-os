@@ -70,9 +70,31 @@ end
 print(("curator on duty (keep side: %s)"):format(KEEP_FACE == 2 and "behind" or "left"))
 print("policy: stackables + gems + good books live, junk and weak books die")
 
+-- verdict cache: detailed item lookups are server roundtrips; most volume is
+-- the same few dozen ids, so remember rulings by name. Books are always
+-- re-examined (their enchants differ per book).
+local verdictCache = {}
+local function verdict(slot)
+  local basic = turtle.getItemDetail(slot)
+  if not basic then return nil end
+  if basic.name:find("enchanted_book", 1, true) then
+    local d = turtle.getItemDetail(slot, true)
+    return keepable(d), d.count
+  end
+  local cached = verdictCache[basic.name]
+  if cached == nil then
+    local d = turtle.getItemDetail(slot, true)
+    cached = keepable(d)
+    verdictCache[basic.name] = cached
+  end
+  return cached, basic.count
+end
+
 local kept, trashed = 0, 0
 while true do
+  local sucked = false
   while turtle.suckDown() do
+    sucked = true
     local full = true
     for slot = 1, 16 do
       if turtle.getItemCount(slot) == 0 then full = false break end
@@ -85,11 +107,11 @@ while true do
     local wantKeep = pass == 2
     face(wantKeep and KEEP_FACE or 0)
     for slot = 1, 16 do
-      local d = turtle.getItemDetail(slot, true)
-      if d and keepable(d) == wantKeep then
+      local keep, count = verdict(slot)
+      if keep ~= nil and keep == wantKeep then
         turtle.select(slot)
         if turtle.drop() then
-          if wantKeep then kept = kept + d.count else trashed = trashed + d.count end
+          if wantKeep then kept = kept + count else trashed = trashed + count end
         else
           stuck = true
         end
@@ -100,5 +122,6 @@ while true do
   if stuck then
     print("!! a destination is full or missing - holding cargo, will retry")
   end
-  sleep(SWEEP_SECONDS)
+  -- adaptive pace: keep working while there's a backlog, rest when idle
+  sleep(sucked and 0.5 or SWEEP_SECONDS)
 end
