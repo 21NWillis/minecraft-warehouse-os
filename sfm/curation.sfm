@@ -1,8 +1,9 @@
-﻿-- Paperclip curation + standing janitor. Paste into the Factory Manager.
--- Labels: intake (pipe-fed chest), store (Storage Controller), judge
--- (curator buffer), trash (the trash can). All must be cabled.
--- Block 1: the fast lane. Block 2: filtered-INPUT janitor - pulls ONLY the
--- junk list from the whole network, so good items never cycle.
+﻿-- Paperclip curation v3. Labels: intake (pipe-fed chest), store (SS Storage
+-- Controller), judge (curator buffer), vault (ME INTERFACE - items pushed
+-- in enter the ME cells), trash (trash can). All cabled to the manager.
+-- FIELD FACT: AE2 storage buses refuse to mount on the SS controller, so
+-- the systems are split by strength instead: bulk -> barrels (CC-visible
+-- economy), books -> the curator, long tail -> ME cells via the interface.
 NAME "paperclip curation"
 
 EVERY 20 TICKS DO
@@ -13,7 +14,8 @@ EVERY 20 TICKS DO
          minecraft:tropical_fish, minecraft:pufferfish, minecraft:glow_berries,
          minecraft:prismarine_shard, minecraft:prismarine_crystals
     TO store
-  OUTPUT TO judge
+  OUTPUT minecraft:enchanted_book TO judge
+  OUTPUT TO vault
 END
 
 EVERY 20 TICKS DO
