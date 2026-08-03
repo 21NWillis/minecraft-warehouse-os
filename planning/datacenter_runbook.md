@@ -116,6 +116,20 @@ hold (1 roll/sec, 10% diamond), fit out: water in the channels, strainer
 rows, collection + sorting into the warehouse, and put DIAMONDS/SEC on the
 NOC monitor wall.
 
+## Phase 7 status (2026-08-03): STAGED PLAN ACTIVE
+
+Storage doctrine (CC can't see into ME cells - no ME bridge in pack - so):
+bulk stackables live in the CC-visible tier-5 barrel wall (storage bus,
+HIGH priority; feeds grid/nocboard/Lens/curator); the long-tail item types
+live in ME cells (LOW priority, native balancing). One terminal shows both.
+- Stage 1 (bridge, done/tonight): energy acceptor + STORAGE BUS ON THE
+  STORAGE CONTROLLER + crafting terminal, ad-hoc (no ME controller).
+- Stage 2: meteorite sky stone -> ME Controller; drives + cells from the
+  64x processor hoard; priorities barrels>cells; SFM `store` label moves to
+  an ME Interface so the fast lane feeds the unified network.
+- Stage 3: assemblers + pattern providers (autocrafting), ae2wtlib wireless
+  terminal, tower ME lobby, server-room aesthetics fit-out.
+
 ## Phase 7 — ME uplink (the giga system)
 
 Architecture: ALL storage/crafting hardware in the void; the tower is a
