@@ -147,6 +147,35 @@ elseif cmd == "build" then
     end
   end
 
+  -- frame self-check (once the casino exists, it physically defines
+  -- campus-south): fly a short probe BEHIND the launch facing and confirm
+  -- the deck is there. A turtle placed 180 degrees wrong gets refused
+  -- instead of building annexes on the casino roof. Texture-free truth.
+  if builtSet()["casino"] and site.key ~= "casino" then
+    print("frame check: looking for the casino behind me...")
+    if not (goTo(0, M.CORRIDOR_Y, 0) and goTo(0, M.CORRIDOR_Y, -14)) then
+      print("frame check aborted: corridor blocked")
+      return
+    end
+    local found = false
+    while pose.y > -3 do
+      local occ = turtle.detectDown()
+      if occ then found = true break end
+      if not ops.down() then break end
+    end
+    goTo(0, M.CORRIDOR_Y, -14)
+    goTo(0, M.CORRIDOR_Y, 0)
+    goTo(0, 0, 0)
+    face(0)
+    if not found then
+      print("FRAME CHECK FAILED: no casino deck behind me.")
+      print("I'm facing the wrong way. Re-place me so `go forward` moves")
+      print("AWAY from the casino, then rerun this command.")
+      return
+    end
+    print("frame confirmed (casino is behind me)")
+  end
+
   print(("%s: %d blocks; flying out..."):format(site.name, s:count()))
   local placed, err
   if resuming then
