@@ -65,10 +65,20 @@ local function listInsc()
   return nil
 end
 
--- movement dance around the inscriber (home = side cell, facing it)
+-- movement dance around the inscriber (home = side cell, facing it).
+-- NOTE the turtle's OWN column needs air above and below too - it rises in
+-- place, then steps over the inscriber.
+local lastMoveErr = nil
 local function toTop()
-  if not turtle.up() then return false end
-  if not turtle.forward() then turtle.down() return false end
+  if not turtle.up() then
+    lastMoveErr = "the cell directly above ME is blocked (or I'm out of fuel)"
+    return false
+  end
+  if not turtle.forward() then
+    turtle.down()
+    lastMoveErr = "the cell directly above the INSCRIBER is blocked"
+    return false
+  end
   return true
 end
 local function fromTop()
@@ -76,8 +86,15 @@ local function fromTop()
   turtle.down()
 end
 local function toBottom()
-  if not turtle.down() then return false end
-  if not turtle.forward() then turtle.up() return false end
+  if not turtle.down() then
+    lastMoveErr = "the cell directly below ME is blocked (or I'm out of fuel)"
+    return false
+  end
+  if not turtle.forward() then
+    turtle.up()
+    lastMoveErr = "the cell directly below the INSCRIBER is blocked"
+    return false
+  end
   return true
 end
 local function fromBottom()
@@ -87,14 +104,14 @@ end
 
 local function insertTop(name)
   if not ensure(name) then return false, "missing " .. name end
-  if not toTop() then return false, "cannot reach above the inscriber (needs air up there)" end
+  if not toTop() then return false, lastMoveErr end
   local ok = turtle.dropDown(1)
   fromTop()
   return ok, ok or "top face refused " .. name
 end
 local function insertBottom(name)
   if not ensure(name) then return false, "missing " .. name end
-  if not toBottom() then return false, "cannot reach below the inscriber (needs air down there)" end
+  if not toBottom() then return false, lastMoveErr end
   local ok = turtle.dropUp(1)
   fromBottom()
   return ok, ok or "bottom face refused " .. name
