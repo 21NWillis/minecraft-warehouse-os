@@ -169,7 +169,13 @@ long tail:
    6b. Weapons division: Apotheosis sword grind rides the refinery - hyper
    spawner box doubles as the gem/affix farm + Gateways arena; casino funds
    reforges; cataclysm boss mats feed it (apothic_cataclysm).
-7. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
+7. Sharded construction (shardrun): partition a schematic into disjoint
+   x-slabs, one per turtle - fleet.lua leases the slabs (no double-assign,
+   dead-worker reclaim), every turtle docks against the same ender-chest
+   channel, and each shard's serpentine/hover/home column stays inside its
+   own slab so N turtles never share airspace. Provisioning via the floppy
+   drive. Turns hall-scale builds into minutes and mega-builds into possible.
+8. Then the fun roadmap: turbine control, GPS constellation, the GPU hall
    for the Java mod when the server adds it, orbital anything.
 
 ## Appendix A — zero-to-tower walkthrough (phase 0, exact steps)
