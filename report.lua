@@ -7,7 +7,10 @@ if #args == 0 then
 end
 
 local parent = term.current()
-local w, h = parent.getSize()
+local w, ph = parent.getSize()
+-- capture window far taller than the screen so long output doesn't scroll
+-- away (only the top screenful renders live; the full text is captured)
+local h = 150
 local win = window.create(parent, 1, 1, w, h, true)
 local old = term.redirect(win)
 local ok, err = pcall(shell.run, table.unpack(args))
