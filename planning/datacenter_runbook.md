@@ -185,6 +185,23 @@ long tail:
    EMC-burn via transmute for surplus with value (the conservation-honest
    version of voiding).
 
+## THE RESOURCE PROGRAM (next session): scale Mekanism like stupid
+
+Field audit (2026-08-03): MA seeds are DISABLED pack-wide (no farm path).
+But EMC prices: osmium ingot 256, redstone 64, diamond ~8192 - and the
+casino prints ~3.8k diamonds/hr (wave 1) = ~31M EMC/hr = ~120k osmium/hr
+equivalent. The casino IS the universal mine; conversion is `transmute`.
+1. Bring `transmute` online on the warehouse computer (controller live,
+   EMC streams - expect a doctor-style first-contact shakeout; report to
+   Claude). Burn diamond/emerald surplus -> EMC bank -> emit osmium/
+   redstone/anything priced, on demand.
+2. Mekanism bootstrap from the emitted stock: metallurgic infuser ->
+   enrichment -> factories -> 4-5x ore processing (multiplies everything
+   else too) -> power wing.
+3. Honest-path backlog: turtle quarry fleet in the JAMD mining dimension
+   (fleet.lua leases + shardrun) for unpriced/mass items; FTB Stuff sluice
+   tables need an in-game JEI check someday. Both deprioritized vs EMC.
+
 ## Bring-up order after construction (systems, not structures)
 
 1. NOC computer: `update`, `menu install`, `profiler tick 60` for a baseline
