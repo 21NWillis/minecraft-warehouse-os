@@ -126,6 +126,28 @@ Order of operations:
    the human-facing UI layer on the same physical stock. melink.lua was
    built for exactly this handoff.
 
+## Phase 7b — storage tiering / auto-balance (dump-proofing, later stage)
+
+Goal: dumping a full inventory NEVER eats ME cell types. Design = priority
+cascade where mass items go to typeless storage and cells only hold the
+long tail:
+
+1. **Drawer wall** (Functional Storage, in the void warehouse hall) behind
+   an ME Storage Bus at HIGH priority, partitioned: every bulk item
+   (cobble/stone/concrete/ores/ingots/strainer aggregate...) gets a drawer
+   with max upgrades. Drawers are one-type-huge-count = no types math at
+   all. This absorbs inventory dumps before any cell sees them.
+2. **General cells** at LOW priority catch everything unrecognized (the
+   long tail is exactly what the types system is fine at).
+3. **Promotion loop**: the CC warehouse already indexes stock through ME
+   Interfaces - a `defrag` service tracks which long-tail items keep
+   showing up in volume and flags "promote to drawer" on the NOC dashboard
+   (and later auto-crafts + places the drawer upgrade order). IO Port
+   cycles migrate existing cell contents after each promotion.
+4. Overflow policy: drawer void upgrades on true-junk bulk (cobble tiers),
+   EMC-burn via transmute for surplus with value (the conservation-honest
+   version of voiding).
+
 ## Bring-up order after construction (systems, not structures)
 
 1. NOC computer: `update`, `menu install`, `profiler tick 60` for a baseline
