@@ -1,225 +1,249 @@
--- aefab: AE2 component production line. A turtle conducts an inscriber and
--- your (Functional Storage) controller network: raw materials flow drawers ->
--- inscriber -> drawers with the turtle as pure orchestrator - it never even
--- holds the items. Self-calibrating: it learns the inscriber's slot layout
--- by probing, so no hardcoded assumptions about AE2's inventory order.
+-- aefab: AE2 component fab, inventory mode - the turtle carries all
+-- materials and works an inscriber by physically visiting its faces:
+--   above -> top slot | below -> bottom slot | side -> middle slot
+-- After every insertion it READS the inscriber (adjacent peripheral, .list())
+-- to verify where things landed - no blind faith in face mappings. Presses
+-- are recovered between phases by digging + re-placing the inscriber
+-- (contents pop into the turtle; brutal, deterministic).
 --
--- Rig: turtle adjacent to BOTH the inscriber and the storage controller
--- (directly, or via wired modems on one network). Coal generator powering
--- the inscriber. Presses + raw materials in the drawer network.
+-- RIG (build exactly this):
+--        [air]                <- turtle needs this cell
+--   [gen][INSCRIBER]          <- coal generator on any side
+--        [air]                <- and this cell
+--   [TURTLE->]                <- facing the inscriber from another side
+-- i.e. inscriber on a pedestal/floating with air directly above AND below,
+-- turtle (with pickaxe) facing it from a side, generator on a different side.
 --
---   aefab probe             show what I can see (run this FIRST, send output)
---   aefab press             duplicate all 4 presses (needs iron blocks)
---   aefab make <n>          produce n of each processor (logic/calc/engineering)
+--   aefab probe        first contact: map the faces, print everything. SEND ME THIS.
+--   aefab press        duplicate all presses aboard (needs iron blocks)
+--   aefab make <n>     n of each processor (logic/calculation/engineering)
 --
--- Materials for `make 16`: 16 gold ingots, 16 certus quartz crystals,
--- 16 diamonds, 48 redstone, 48 silicon, + the 4 presses, all in the drawers.
+-- Loadout for `make 16`: 4 presses, 4 iron blocks, 16 gold ingots,
+-- 16 certus quartz crystals, 16 diamonds, 48 redstone, 48 silicon, 32 coal.
 local PRESSES = {
-  silicon = "ae2:silicon_press",
-  logic = "ae2:logic_processor_press",
-  calculation = "ae2:calculation_processor_press",
-  engineering = "ae2:engineering_processor_press",
+  { key = "silicon", id = "ae2:silicon_press" },
+  { key = "logic", id = "ae2:logic_processor_press" },
+  { key = "calculation", id = "ae2:calculation_processor_press" },
+  { key = "engineering", id = "ae2:engineering_processor_press" },
 }
-local RECIPES = {
-  { press = "silicon", input = "ae2:silicon", output = "ae2:printed_silicon" },
-  { press = "logic", input = "minecraft:gold_ingot", output = "ae2:printed_logic_processor" },
-  { press = "calculation", input = "ae2:certus_quartz_crystal", output = "ae2:printed_calculation_processor" },
-  { press = "engineering", input = "minecraft:diamond", output = "ae2:printed_engineering_processor" },
+local PRINTS = {
+  { press = "ae2:silicon_press", input = "ae2:silicon", output = "ae2:printed_silicon" },
+  { press = "ae2:logic_processor_press", input = "minecraft:gold_ingot", output = "ae2:printed_logic_processor" },
+  { press = "ae2:calculation_processor_press", input = "ae2:certus_quartz_crystal", output = "ae2:printed_calculation_processor" },
+  { press = "ae2:engineering_processor_press", input = "minecraft:diamond", output = "ae2:printed_engineering_processor" },
 }
-local COMBINE = {
-  { top = "ae2:printed_logic_processor", bottom = "ae2:printed_silicon",
-    mid = "minecraft:redstone", output = "ae2:logic_processor" },
-  { top = "ae2:printed_calculation_processor", bottom = "ae2:printed_silicon",
-    mid = "minecraft:redstone", output = "ae2:calculation_processor" },
-  { top = "ae2:printed_engineering_processor", bottom = "ae2:printed_silicon",
-    mid = "minecraft:redstone", output = "ae2:engineering_processor" },
+local PROCESSORS = {
+  { top = "ae2:printed_logic_processor", output = "ae2:logic_processor" },
+  { top = "ae2:printed_calculation_processor", output = "ae2:calculation_processor" },
+  { top = "ae2:printed_engineering_processor", output = "ae2:engineering_processor" },
 }
+local SILICON_PRINT = "ae2:printed_silicon"
+local REDSTONE = "minecraft:redstone"
 
--- ---- find the two peripherals -----------------------------------------------
-local function findPeripherals()
-  local insc, store
-  for _, name in ipairs(peripheral.getNames()) do
-    local t = peripheral.getType(name) or ""
-    if tostring(t):lower():find("inscriber") then insc = name
-    elseif tostring(t):lower():find("controller") or tostring(t):lower():find("storage") then
-      store = store or name
-    end
+-- ---- turtle-side helpers ----------------------------------------------------
+local function ensure(name)
+  for slot = 1, 16 do
+    local d = turtle.getItemDetail(slot)
+    if d and d.name == name then turtle.select(slot) return true end
   end
-  -- fallback: any non-inscriber inventory-ish peripheral is the store
-  if not store then
-    for _, name in ipairs(peripheral.getNames()) do
-      if name ~= insc then
-        local p = peripheral.wrap(name)
-        if p and p.list then store = name end
-      end
-    end
+  return false
+end
+local function count(name)
+  local n = 0
+  for slot = 1, 16 do
+    local d = turtle.getItemDetail(slot)
+    if d and d.name == name then n = n + d.count end
   end
-  return insc, store
+  return n
+end
+local function insc()
+  return peripheral.wrap("front")
+end
+local function listInsc()
+  local p = insc()
+  if p and p.list then return p.list() end
+  return nil
 end
 
-local function findIn(listing, item)
-  for slot, st in pairs(listing) do
-    if st.name == item then return slot, st.count end
-  end
+-- movement dance around the inscriber (home = side cell, facing it)
+local function toTop()
+  if not turtle.up() then return false end
+  if not turtle.forward() then turtle.down() return false end
+  return true
+end
+local function fromTop()
+  turtle.back()
+  turtle.down()
+end
+local function toBottom()
+  if not turtle.down() then return false end
+  if not turtle.forward() then turtle.up() return false end
+  return true
+end
+local function fromBottom()
+  turtle.back()
+  turtle.up()
 end
 
-local args = { ... }
-local cmd = args[1]
-local insc, store = findPeripherals()
-
-if cmd == "probe" or not cmd then
-  print("peripherals I can reach:")
-  for _, name in ipairs(peripheral.getNames()) do
-    print(("  %s [%s]"):format(name, tostring(peripheral.getType(name))))
-  end
-  print("inscriber: " .. tostring(insc))
-  print("storage:   " .. tostring(store))
-  if insc then
-    local p = peripheral.wrap(insc)
-    if p.list then
-      print("inscriber slots currently:")
-      for slot, st in pairs(p.list()) do
-        print(("  slot %d: %s x%d"):format(slot, st.name, st.count))
-      end
-      print(("inscriber reports %s slots total"):format(tostring(p.size and p.size())))
-    else
-      print("inscriber exposes NO inventory API - send me this output")
-    end
-  end
-  if not cmd then print("usage: aefab probe|press|make <n>") end
-  return
+local function insertTop(name)
+  if not ensure(name) then return false, "missing " .. name end
+  if not toTop() then return false, "cannot reach above the inscriber (needs air up there)" end
+  local ok = turtle.dropDown(1)
+  fromTop()
+  return ok, ok or "top face refused " .. name
+end
+local function insertBottom(name)
+  if not ensure(name) then return false, "missing " .. name end
+  if not toBottom() then return false, "cannot reach below the inscriber (needs air down there)" end
+  local ok = turtle.dropUp(1)
+  fromBottom()
+  return ok, ok or "bottom face refused " .. name
+end
+local function insertSide(name)
+  if not ensure(name) then return false, "missing " .. name end
+  return turtle.drop(1), "side face refused " .. name
 end
 
-if not insc or not store then
-  print("cannot find both peripherals (inscriber=" .. tostring(insc)
-    .. ", storage=" .. tostring(store) .. ") - run `aefab probe`")
-  return
-end
-local I = peripheral.wrap(insc)
-local S = peripheral.wrap(store)
-
--- ---- self-calibration: learn which inscriber slots accept what --------------
--- push a press: the slots that accept it are the press slots (top/bottom).
--- push a material with a press seated: the accepting slot is the middle.
--- output slot = where the product shows up.
-local function learnSlots()
-  local pressName
-  local sList = S.list()
-  for _, id in pairs(PRESSES) do
-    if findIn(sList, id) then pressName = id break end
-  end
-  if not pressName then return nil, "no press found in storage" end
-  local from = findIn(S.list(), pressName)
-  local pressSlot
-  for slot = 1, (I.size and I.size() or 4) do
-    if S.pushItems(insc, from, 1, slot) > 0 then pressSlot = slot break end
-  end
-  if not pressSlot then return nil, "inscriber refused a press in every slot" end
-  local midSlot
-  local matFrom = findIn(S.list(), "minecraft:redstone")
-    or findIn(S.list(), "minecraft:gold_ingot")
-  if matFrom then
-    for slot = 1, (I.size and I.size() or 4) do
-      if slot ~= pressSlot and S.pushItems(insc, matFrom, 1, slot) > 0 then
-        midSlot = slot
-        I.pushItems(store, slot)         -- take the probe material back
-        break
-      end
-    end
-  end
-  I.pushItems(store, pressSlot)          -- take the probe press back
-  return { press = pressSlot, mid = midSlot }
-end
-
-local function clearInscriber()
-  for slot in pairs(I.list()) do I.pushItems(store, slot) end
-end
-
-local function waitFor(item, timeout)
-  local deadline = os.clock() + (timeout or 30)
+--- collect finished output: try the side, then underneath
+local function collect(output, timeout)
+  local deadline = os.clock() + (timeout or 25)
   while os.clock() < deadline do
-    local slot = findIn(I.list(), item)
-    if slot then return slot end
+    local before = count(output)
+    turtle.suck()
+    if count(output) > before then return true end
+    if toBottom() then
+      turtle.suckUp()
+      fromBottom()
+      if count(output) > before then return true end
+    end
     sleep(1)
   end
+  return false
 end
 
---- seat `press` (or nil), feed inputs, wait for output, return it to storage.
-local function craft(pressId, inputs, output, slots)
-  if pressId then
-    local from = findIn(S.list(), pressId)
-    if not from then return false, "missing " .. pressId end
-    if S.pushItems(insc, from, 1, slots.press) == 0 then return false, "press slot refused" end
+--- nuclear recovery: dig the inscriber (contents pop aboard), re-place it
+local function recoverAll()
+  if not ensure("ae2:inscriber") then
+    -- not holding one: dig the block in front
+    if not turtle.dig() then return false, "cannot dig the inscriber" end
+    sleep(0.2)
   end
-  for slot, item in pairs(inputs) do
-    local from = findIn(S.list(), item)
-    if not from then clearInscriber() return false, "missing " .. item end
-    if S.pushItems(insc, from, 1, slot) == 0 then
-      clearInscriber()
-      return false, "inscriber refused " .. item .. " in slot " .. slot
+  if not ensure("ae2:inscriber") then return false, "inscriber item not in my inventory after digging" end
+  if not turtle.place() then return false, "cannot re-place the inscriber" end
+  sleep(0.2)
+  return true
+end
+
+-- ---- commands ---------------------------------------------------------------
+local args = { ... }
+local cmd = args[1]
+
+if cmd == "probe" then
+  print("front peripheral: " .. tostring(peripheral.getType("front")))
+  local l = listInsc()
+  if l then
+    print("inscriber inventory now:")
+    local any = false
+    for slot, st in pairs(l) do
+      any = true
+      print(("  slot %d: %s x%d"):format(slot, st.name, st.count))
+    end
+    if not any then print("  (empty)") end
+  else
+    print("no .list() on the front block - is the turtle facing the inscriber?")
+  end
+  print("face test: dropping 1 redstone via top/bottom/side, reading slots...")
+  local findings = {}
+  local probes = { { "top", insertTop }, { "bottom", insertBottom }, { "side", insertSide } }
+  for _, p in ipairs(probes) do
+    if ensure(REDSTONE) then
+      local before = listInsc() or {}
+      local ok = p[2](REDSTONE)
+      local after = listInsc() or {}
+      local landed = "refused"
+      for slot, st in pairs(after) do
+        if not before[slot] or before[slot].count < st.count then
+          landed = "slot " .. slot
+        end
+      end
+      findings[#findings + 1] = p[1] .. " -> " .. (ok and landed or "refused")
+    else
+      findings[#findings + 1] = p[1] .. " -> (no redstone aboard to test)"
     end
   end
-  local outSlot = waitFor(output, 30)
-  clearInscriber()
-  if not outSlot then return false, "timed out waiting for " .. output .. " (is the inscriber powered?)" end
+  for _, f in ipairs(findings) do print("  " .. f) end
+  print("recovering probe items (dig + re-place)...")
+  local ok, err = recoverAll()
+  print(ok and "recovered." or ("RECOVERY FAILED: " .. tostring(err)))
+  print("send this whole output to Claude before running press/make")
+  return
+end
+
+--- run one inscribe: seat press (top), feed input (side->middle), collect.
+local function inscribe(press, input, output)
+  local l = listInsc() or {}
+  local seated = false
+  for _, st in pairs(l) do
+    if st.name == press then seated = true end
+  end
+  if not seated then
+    local ok, err = insertTop(press)
+    if not ok then return false, err end
+  end
+  local ok, err = insertSide(input)
+  if not ok then return false, err end
+  if not collect(output) then return false, "no " .. output .. " appeared (powered? right press?)" end
   return true
 end
 
 if cmd == "press" then
-  local slots, err = learnSlots()
-  if not slots then print("calibration failed: " .. err) return end
-  print(("calibrated: press slot %d, middle slot %s"):format(slots.press, tostring(slots.mid)))
-  for key, id in pairs(PRESSES) do
-    local ok, cerr = craft(id, { [slots.mid] = "minecraft:iron_block" }, id, slots)
-    print((ok and "duplicated %s" or "FAILED %s: " .. tostring(cerr)):format(key))
+  for _, p in ipairs(PRESSES) do
+    if count(p.id) > 0 then
+      local ok, err = inscribe(p.id, "minecraft:iron_block", p.id)
+      print((ok and "duplicated " or "FAILED ") .. p.key .. (ok and "" or (": " .. tostring(err))))
+      recoverAll()
+    else
+      print("no " .. p.key .. " press aboard, skipping")
+    end
   end
 
 elseif cmd == "make" then
   local n = tonumber(args[2]) or 8
-  local slots, err = learnSlots()
-  if not slots then print("calibration failed: " .. err) return end
-  print(("calibrated: press slot %d, middle slot %s"):format(slots.press, tostring(slots.mid)))
-  -- prints first (n of each + n silicon per processor type)
-  for _, r in ipairs(RECIPES) do
-    local want = r.press == "silicon" and n * 3 or n
+  -- phase 1: prints (silicon prints = 3n, one per processor)
+  for _, r in ipairs(PRINTS) do
+    local want = r.output == SILICON_PRINT and n * 3 or n
+    local made = 0
     for i = 1, want do
-      local ok, cerr = craft(PRESSES[r.press], { [slots.mid] = r.input }, r.output, slots)
-      if not ok then print(("%s %d/%d FAILED: %s"):format(r.output, i, want, cerr)) break end
-      if i % 4 == 0 or i == want then print(("%s %d/%d"):format(r.output, i, want)) end
+      local ok, err = inscribe(r.press, r.input, r.output)
+      if not ok then print(("%s stopped at %d/%d: %s"):format(r.output, made, want, tostring(err))) break end
+      made = made + 1
+      if made % 8 == 0 or made == want then print(("%s %d/%d"):format(r.output, made, want)) end
     end
+    recoverAll()   -- pull the press back before the next phase
   end
-  -- processors: print top, silicon print bottom, redstone middle, no press
-  local other = slots.press          -- with no press seated, both press slots free
-  for _, c in ipairs(COMBINE) do
+  -- phase 2: processors - print top, silicon print bottom, redstone middle
+  for _, c in ipairs(PROCESSORS) do
+    local made = 0
     for i = 1, n do
-      local ok, cerr = (function()
-        local f1 = findIn(S.list(), c.top)
-        local f2 = findIn(S.list(), c.bottom)
-        if not (f1 and f2) then return false, "missing prints" end
-        if S.pushItems(insc, f1, 1, slots.press) == 0 then return false, "top refused" end
-        -- find the second press-capable slot for the silicon print
-        local seated = false
-        for slot = 1, (I.size and I.size() or 4) do
-          if slot ~= slots.press and slot ~= slots.mid then
-            if S.pushItems(insc, f2, 1, slot) > 0 then seated = true break end
-          end
-        end
-        if not seated then clearInscriber() return false, "bottom refused" end
-        local fr = findIn(S.list(), c.mid)
-        if not fr or S.pushItems(insc, fr, 1, slots.mid) == 0 then
-          clearInscriber()
-          return false, "redstone refused"
-        end
-        local out = waitFor(c.output, 30)
-        clearInscriber()
-        if not out then return false, "timeout" end
-        return true
-      end)()
-      if not ok then print(("%s %d/%d FAILED: %s"):format(c.output, i, n, cerr)) break end
-      if i % 4 == 0 or i == n then print(("%s %d/%d"):format(c.output, i, n)) end
+      local ok, err = insertTop(c.top)
+      if ok then ok, err = insertBottom(SILICON_PRINT) end
+      if ok then ok, err = insertSide(REDSTONE) end
+      if ok and not collect(c.output) then ok, err = false, "no output (powered?)" end
+      if not ok then
+        print(("%s stopped at %d/%d: %s"):format(c.output, made, n, tostring(err)))
+        recoverAll()
+        break
+      end
+      made = made + 1
+      if made % 4 == 0 or made == n then print(("%s %d/%d"):format(c.output, made, n)) end
     end
   end
-  print("done - components are in the drawers")
+  print("done - components are aboard. inventory:")
+  for slot = 1, 16 do
+    local d = turtle.getItemDetail(slot)
+    if d then print(("  %s x%d"):format(d.name, d.count)) end
+  end
 else
   print("aefab probe|press|make <n>")
+  print("run `aefab probe` FIRST and send the output to Claude")
 end
