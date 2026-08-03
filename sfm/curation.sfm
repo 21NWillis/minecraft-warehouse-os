@@ -55,8 +55,7 @@ EVERY 20 TICKS DO
     minecraft:sculk_catalyst,
     minecraft:sculk_sensor,
     minecraft:soul_torch,
-    minecraft:silence_armor_trim_smithing_template,
-    minecraft:ward_armor_trim_smithing_template,
+    minecraft:*_smithing_template,
     caverns_and_chasms:bejeweled_apple,
     caverns_and_chasms:bejeweled_pearl
     TO store
