@@ -40,6 +40,24 @@ At 0.1% target: 150k copper, 100k lapis (stock: 341k ✓ covers to
     extendable - bay 11 copper, bay 12 lapis) or split the sandbox.
   * Sail + beam + PACKAGE patterns in AE2 (packages = dense gun feed).
 
+## Gun array intelligence (survey xj254Qze, Errot's field, 2026-08-04)
+
+24 ejectors on a 3-BLOCK PITCH grid (x and z): each gun = a 1x1x2
+pillar of formed multiblock on a SHARED continuous slab (y1, 18x11
+here); item pipes run in TRENCHES UNDER the slab (y0) feeding each
+gun column from below; energy pipe grid at pillar height (y2) with a
+flux point + JDT energy transmitter as the drop; one buffer chest at
+the array's south feed. Copy this pattern - it's dense and proven.
+
+⚠ FORMED-STATE BLINDNESS: the scan (and any quill capture) sees only
+dysoncubeproject:multiblock_structure - formed multiblocks HIDE their
+constituent blocks, and structure blocks aren't obtainable items, so
+CANNON-PRINTING FORMED GUNS WON'T WORK. Required intel before gunfit:
+the pre-formation constituents + formation trigger (JEI's structure
+preview for the EM Rail Ejector, or ask Errot). Automation shape:
+place constituents (turtle/cannon) + trigger formation (probably a
+controller right-click - deployer candidate).
+
 ## Phase 2 — the gun farm
   * `gunfit` (after the survey): a row of N ejectors on the sky
     campus, artillery-style, pipez trunk feeding packages from the

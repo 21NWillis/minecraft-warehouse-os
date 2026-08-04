@@ -70,3 +70,6 @@ bursarfit.lua
 farmfit.lua
 printfit.lua
 enchantfit.lua
+crafthub.lua
+craftcell.lua
+craftd.lua

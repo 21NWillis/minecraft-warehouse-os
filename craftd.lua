@@ -1,0 +1,221 @@
+-- craftd: the dispatcher daemon (design: planning/craftd.md).
+-- Runs on the warehouse computer (wired modem to all storage + cell
+-- chests, wireless modem for the cell channel). Takes an order, plans
+-- it with planner against live storage, stages ingredients into cell
+-- input chests via the peripheral API, dispatches batches across all
+-- idle cells, routes outputs back to storage.
+--
+-- SETUP: craftd.cfg on this computer:
+--   { storage = { "chestName1", "chestName2", ... } }
+-- (peripheral names of the storage chests on the wired network - the
+-- collector chest and friends. NEVER a controller.)
+--
+-- USAGE:
+--   craftd                       interactive: order loop
+--   craftd <count> <search...>   one order, then exit
+local db = require("recipedb")
+local planner = require("planner")
+local hub = require("crafthub")
+
+local PROTOCOL = "paperclip.craft"
+local CFG = "craftd.cfg"
+
+if not fs.exists(CFG) then
+  print("write " .. CFG .. ' first: { storage = { "chest_name", ... } }')
+  return
+end
+local cfgFile = fs.open(CFG, "r")
+local cfg = textutils.unserialize(cfgFile.readAll())
+cfgFile.close()
+
+for _, side in ipairs(peripheral.getNames()) do
+  if peripheral.getType(side) == "modem" then
+    local m = peripheral.wrap(side)
+    if m.isWireless and m.isWireless() then rednet.open(side) end
+  end
+end
+
+print("loading recipe database...")
+local ok, err = db.load("data")
+if not ok then
+  printError("recipedb: " .. tostring(err))
+  return
+end
+
+-- ---------------------------------------------------------------- storage
+local function storagePeripherals()
+  local out = {}
+  for _, name in ipairs(cfg.storage) do
+    local p = peripheral.wrap(name)
+    if p and p.list then out[#out + 1] = { name = name, p = p } end
+  end
+  return out
+end
+
+-- live inventory: totals + location index
+local function scanStorage()
+  local have, where = {}, {}
+  for _, s in ipairs(storagePeripherals()) do
+    for slot, item in pairs(s.p.list()) do
+      have[item.name] = (have[item.name] or 0) + item.count
+      where[item.name] = where[item.name] or {}
+      table.insert(where[item.name], { store = s, slot = slot, count = item.count })
+    end
+  end
+  return have, where
+end
+
+-- push `count` of `item` into a cell's input chest; pushItems moves at
+-- most one stack per call (printfit lesson), so loop every location
+local function stage(where, item, count, targetName)
+  local remaining = count
+  for _, loc in ipairs(where[item] or {}) do
+    while remaining > 0 and loc.count > 0 do
+      local moved = loc.store.p.pushItems(targetName, loc.slot, remaining)
+      if moved == 0 then break end
+      remaining = remaining - moved
+      loc.count = loc.count - moved
+    end
+    if remaining <= 0 then break end
+  end
+  return remaining <= 0
+end
+
+-- drain a cell's output chest back into storage
+local function collect(outputName)
+  local out = peripheral.wrap(outputName)
+  if not (out and out.list) then return end
+  for slot in pairs(out.list()) do
+    for _, s in ipairs(storagePeripherals()) do
+      while out.pushItems(s.name, slot) > 0 do end
+      if not out.list()[slot] then break end
+    end
+  end
+end
+
+-- ------------------------------------------------------------------ cells
+local cells = {}
+
+local function discoverCells()
+  rednet.broadcast({ type = "ping" }, PROTOCOL)
+  local deadline = os.clock() + 2
+  while os.clock() < deadline do
+    local _, msg = rednet.receive(PROTOCOL, 0.5)
+    if type(msg) == "table" and msg.type == "hello" and msg.id then
+      cells[msg.id] = { id = msg.id, busy = 0,
+        input = msg.input, output = msg.output }
+    end
+  end
+end
+
+-- ------------------------------------------------------------------ orders
+local nextJobId = 1
+
+local function runStep(step, where)
+  local batches = hub.batchSizes(step.times)
+  local inFlight = {}
+  local bi = 1
+  while bi <= #batches or next(inFlight) do
+    -- dispatch to every idle cell
+    while bi <= #batches do
+      local cell = hub.pickCell(cells)
+      if not cell or (cell.busy or 0) > 0 then break end
+      local batch = batches[bi]
+      local totals = hub.stageTotals(step, batch)
+      local staged = true
+      for item, count in pairs(totals) do
+        if not stage(where, item, count, cell.input) then
+          staged = false
+          break
+        end
+      end
+      if not staged then
+        return false, "storage ran short staging " .. step.output
+      end
+      local job = hub.jobFor(step, batch)
+      job.type, job.cell, job.jobId = "job", cell.id, nextJobId
+      nextJobId = nextJobId + 1
+      rednet.broadcast(job, PROTOCOL)
+      cell.busy = (cell.busy or 0) + 1
+      inFlight[job.jobId] = cell
+      bi = bi + 1
+    end
+    -- await a completion
+    local _, msg = rednet.receive(PROTOCOL, 30)
+    if type(msg) == "table" and (msg.type == "done" or msg.type == "error")
+        and inFlight[msg.job] then
+      local cell = inFlight[msg.job]
+      cell.busy = cell.busy - 1
+      collect(cell.output)
+      inFlight[msg.job] = nil
+      if msg.type == "error" then
+        return false, ("cell %s: %s"):format(msg.id, tostring(msg.err))
+      end
+    elseif msg == nil and next(inFlight) then
+      return false, "timed out waiting on a cell"
+    end
+  end
+  return true
+end
+
+local function order(count, query)
+  local hits = db.search(query, 5)
+  if #hits == 0 then
+    print("no recipe matches: " .. query)
+    return
+  end
+  local target = hits[1]
+  print(("order: %d x %s"):format(count, db.name(target) or target))
+  local have, where = scanStorage()
+  local steps, missing = planner.plan(db, have, target, count)
+  if not steps then
+    print("cannot craft - missing:")
+    for item, n in pairs(missing) do
+      print(("  %d x %s"):format(n, item))
+    end
+    return
+  end
+  print(("%d steps planned"):format(#steps))
+  for i, step in ipairs(steps) do
+    print(("step %d/%d: %dx %s"):format(i, #steps, step.times, step.output))
+    local okStep, serr = runStep(step, where)
+    if not okStep then
+      printError("stopped: " .. tostring(serr))
+      return
+    end
+    -- refresh the location index: outputs just landed in storage
+    have, where = scanStorage()
+  end
+  print("order complete.")
+end
+
+-- ------------------------------------------------------------------ main
+discoverCells()
+local n = 0
+for _ in pairs(cells) do n = n + 1 end
+print(("craftd online: %d cell(s), %d storage(s)"):format(n, #cfg.storage))
+
+local args = { ... }
+if #args >= 2 then
+  order(tonumber(args[1]) or 1, table.concat(args, " ", 2))
+  return
+end
+
+while true do
+  io.write("craft> ")
+  local line = read()
+  if line == "exit" then break end
+  if line == "cells" then
+    discoverCells()
+    for id, c in pairs(cells) do
+      print(("  %s busy=%d in=%s"):format(id, c.busy or 0, c.input))
+    end
+  elseif line and line ~= "" then
+    local count, query = line:match("^(%d+)%s+(.+)$")
+    if count then
+      order(tonumber(count), query)
+    else
+      order(1, line)
+    end
+  end
+end
