@@ -419,12 +419,14 @@ local function run(t, opts)
   while k <= #BAYS do
     local from = (k == startBay) and startStep or 1
     local steps = genBay(k, base)
-    if from <= 1 then
-      local okF, ferr = refuelAtDepot()
-      if not okF then return false, "bay " .. k .. ": " .. tostring(ferr) end
-      local okKit, kerr = kitRetry(bayBOM(k, base), "bay " .. k .. " (" .. BAYS[k].key .. ")")
-      if not okKit then return false, kerr end
-    end
+    -- kit EVERY bay start, even mid-bay resumes: a crashed turtle's
+    -- inventory can't be trusted (field-learned - it once flew out to
+    -- finish a bay with empty pockets). Over-fetching for a half-built
+    -- bay is harmless; the surplus returns as change.
+    local okF, ferr = refuelAtDepot()
+    if not okF then return false, "bay " .. k .. ": " .. tostring(ferr) end
+    local okKit, kerr = kitRetry(bayBOM(k, base), "bay " .. k .. " (" .. BAYS[k].key .. ")")
+    if not okKit then return false, kerr end
     if opts.report then opts.report(k, BAYS[k].key) end
     local okB, berr = execute(steps, "bay " .. k .. ":" .. BAYS[k].key, from)
     if not okB then return false, berr end
