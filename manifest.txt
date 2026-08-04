@@ -1,4 +1,4 @@
-﻿warehouse.lua
+warehouse.lua
 recipedb.lua
 planner.lua
 plancache.lua

@@ -1,4 +1,4 @@
-﻿-- headless farmfit test: pod layout invariants (bed size, hydration
+-- headless farmfit test: pod layout invariants (bed size, hydration
 -- coverage, rim integrity, machine placement, open underside for
 -- growth-accelerator pillars) plus the full movement simulation.
 package.path = "./?.lua;" .. package.path

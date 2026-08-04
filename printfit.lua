@@ -1,4 +1,4 @@
-﻿-- printfit v3: datum-launched, shardable, SOLAR-SAFE Item Printer.
+-- printfit v3: datum-launched, shardable, SOLAR-SAFE Item Printer.
 -- Design: planning/item_printer.md
 --
 -- THE CORP LAUNCH CONVENTION: turtle ON THE GOLD DATUM facing campus

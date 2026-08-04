@@ -1,4 +1,4 @@
-﻿-- headless printfit v3 test: datum-frame plant east of the warehouse,
+-- headless printfit v3 test: datum-frame plant east of the warehouse,
 -- feeder behind the datum, solar-safety, access tower, 2-shard
 -- partition, resume - and REALISTIC inventory semantics: the mock
 -- feeder MERGES returned stacks into existing slots and suck() always
