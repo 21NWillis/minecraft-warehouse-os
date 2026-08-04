@@ -513,7 +513,16 @@ if shard < 1 or shard > 4 or of < 1 or of > 4 or shard > of then
   return
 end
 
-for slot = 1, 16 do turtle.select(slot); turtle.refuel(64) end
+-- burn ONLY real fuel at startup: turtle.refuel() happily eats wooden
+-- chests (15 fuel each) - it once ate its own reject bin this way
+for slot = 1, 16 do
+  local d = turtle.getItemDetail(slot)
+  if d and (d.name == ITEMS.COAL or d.name == "minecraft:charcoal"
+      or d.name == "minecraft:coal_block") then
+    turtle.select(slot)
+    turtle.refuel(64)
+  end
+end
 turtle.select(1)
 if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 300 then
   print("hand me a stack of coal first (fuel " .. turtle.getFuelLevel() .. ")")
@@ -532,15 +541,17 @@ if fs.exists(STATE) then
   print(("resuming at bay %d step %d"):format(resume.bay, resume.step))
 end
 
-if not resume then
+do
   local hasBin = false
   for slot = 1, 16 do
     local d = turtle.getItemDetail(slot)
     if d and d.name == ITEMS.BIN then hasBin = true end
   end
   if not hasBin then
-    print("also hand me ONE plain chest (my reject bin) - required")
-    return
+    -- soft warning only: the bin may already be placed at my dock from
+    -- an earlier attempt; the kit stops authoritatively if truly absent
+    print("note: no plain chest aboard - fine IF my bin already stands")
+    print("at my dock; otherwise I'll stop and ask for one")
   end
 end
 
