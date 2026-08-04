@@ -457,6 +457,29 @@ if _TEST then return M end
 
 -- ==================================================================== program
 local args = { ... }
+
+-- printfit scan: run ON THE DATUM. Prints exactly what the feeder
+-- contains (as the turtle sees it) and what bay 1 wants - compares
+-- ids so mismatches stop being a guessing game.
+if args[1] == "scan" then
+  turtle.turnRight() turtle.turnRight()
+  local p = peripheral.wrap("front")
+  if not (p and p.list) then
+    print("no inventory API in front of me - is the feeder behind the datum?")
+  else
+    print("FEEDER CONTENTS (slot: count x id):")
+    for slot, item in pairs(p.list()) do
+      print(("  %d: %d x %s"):format(slot, item.count, item.name))
+    end
+    print("BAY 1 WANTS:")
+    for name, want in pairs(bayBOM(1, args[2] or "minecraft:cobbled_deepslate")) do
+      print(("  %d x %s"):format(want, name))
+    end
+  end
+  turtle.turnRight() turtle.turnRight()
+  return
+end
+
 local shard, of, base = 1, 1, "minecraft:cobbled_deepslate"
 if tonumber(args[1]) then
   shard = tonumber(args[1])
