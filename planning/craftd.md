@@ -67,6 +67,27 @@ start (turtles are cheap; scale by adding turtles + chests). T1
 crafter bank beside the conversion cluster, pipez-fed. All wired
 modems to the warehouse computer.
 
+## The horizon: the capability fabric (user doctrine, build toward)
+
+craftd's brain must not know what a cell IS - only what it CAN DO.
+Cells advertise capabilities ({craft}, {smelt}, {infuse}, {conduct},
+{harvest}...); jobs declare a required capability plus input/output
+contracts; the planner compiles goals into producer/consumer DAGs and
+the dispatcher schedules onto whatever advertises the capability.
+"Teaching the platform a new machine" = dropping a DRIVER module in
+the repo - a small Lua file wrapping one weird peripheral (a Create
+train station IS a CC peripheral: a conductor cell is just a driver
+that schedules trains). Generalist behaviors (craft/smelt/move-items)
+ship built in so the long tail needs no teaching at all.
+
+The repo already rehearsed this pattern everywhere: builder, quarry,
+survey, printfit all take injected ops tables - drivers by another
+name. craftd v1 implements craft+smelt ONLY, but shapes the registry
+and job schema open from day one, so the fabric grows by accretion,
+never rewrite. (Yes, this is a warp scheduler with specialized
+kernels; the lease queue is the atomic; a turtle eating its own
+staging chest is warp divergence. The metaphor is load-bearing.)
+
 ## Verdict vs AE2 crafting
 
 AE2 assemblers/patterns: skipped entirely. Storage bus + terminals
