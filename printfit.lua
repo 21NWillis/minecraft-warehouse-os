@@ -283,11 +283,12 @@ local function run(t, opts)
     if not (bin and bin.list and bin.pushItems) then
       return false, "bin exposes no inventory API"
     end
-    local function wantOf(name) return bom[name] or 0 end
-    -- dump: leftovers this bay doesn't need go straight to the feeder
+    -- dump EVERYTHING: stray partial stacks fragment the slot budget
+    -- (the BOM fits 16 slots only with cleanly packed stacks - a
+    -- leftover 4-farmland stack once wedged the collect one line
+    -- short, forever). Empty turtle -> perfect packing, every kit.
     for slot = 1, 16 do
-      local d = t.getItemDetail(slot)
-      if d and wantOf(d.name) == 0 then t.select(slot); dropFeeder() end
+      if t.getItemDetail(slot) then t.select(slot); dropFeeder() end
     end
     -- flush: bin residue back into the feeder. pushItems moves at most
     -- ONE STACK per call - mega slots need repeated pushes.
