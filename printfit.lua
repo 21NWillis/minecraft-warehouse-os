@@ -2,8 +2,9 @@
 -- Design: planning/item_printer.md
 --
 -- THE CORP LAUNCH CONVENTION: turtle ON THE GOLD DATUM facing campus
--- north, hand-loaded with A STACK OF COAL and ONE NETHERITE SS CHEST
--- (its reject bin - plain chests overflow). Station furniture:
+-- north, hand-loaded with A STACK OF COAL and ONE PLAIN VANILLA CHEST
+-- (its staging bin - vanilla only, modded chests have extraction
+-- quirks). Station furniture:
 --   * FEEDER (stocked backpack/omega chest) DIRECTLY BEHIND the datum
 --   * COAL CHEST (plain chest, ALL the coal, NOTHING else) 4 blocks
 --     behind the datum (3 behind the feeder)
@@ -60,10 +61,11 @@ local ITEMS = {
   EMPTY_BUCKET = "minecraft:bucket",
   COAL = "minecraft:coal",
   LADDER = "minecraft:ladder",
-  -- reject bin: must swallow the whole churn (deepslate chunks + ~50
-  -- unstackable buckets) - a plain chest's 27 slots drown. Netherite SS
-  -- chest, ideally with a stack upgrade dropped in by hand.
-  BIN = "sophisticatedstorage:netherite_chest",
+  -- staging bin: the v4 API kit stages at most the 16-stack BOM here,
+  -- so a VANILLA chest's 27 slots are plenty - and vanilla chests have
+  -- zero extraction quirks (the netherite SS bin accepted pushes but
+  -- refused suck/push-out in the field)
+  BIN = "minecraft:chest",
 }
 
 -- datum-frame geometry
@@ -269,7 +271,7 @@ local function run(t, opts)
     face(dock.binFace)
     if not t.detect() then
       if not ensure(ITEMS.BIN) then
-        return false, "hand me a netherite SS chest (my reject bin) and rerun"
+        return false, "hand me a plain vanilla chest (my staging bin) and rerun"
       end
       if not t.place() then return false, "cannot place my reject bin" end
     end
@@ -505,7 +507,7 @@ do
   if not hasBin then
     -- soft warning only: the bin may already be placed at my dock from
     -- an earlier attempt; the kit stops authoritatively if truly absent
-    print("note: no netherite chest aboard - fine IF my bin already")
+    print("note: no vanilla chest aboard - fine IF my bin already")
     print("stands at my dock; otherwise I'll stop and ask for one")
   end
 end
