@@ -1,5 +1,7 @@
 {
   "key.categories.paperclip_lens": "Paperclip Lens",
   "key.paperclip_lens.esp": "Toggle turtle ESP",
-  "key.paperclip_lens.snapshot": "Dump world model snapshot"
+  "key.paperclip_lens.snapshot": "Dump world model snapshot",
+  "key.paperclip_lens.control": "Arm/disarm Claude control",
+  "key.paperclip_lens.blame": "Blame block (world history)"
 }

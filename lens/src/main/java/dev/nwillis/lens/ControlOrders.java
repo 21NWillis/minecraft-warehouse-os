@@ -38,32 +38,21 @@ public final class ControlOrders {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*.json")) {
             for (Path order : stream) {
                 String name = order.getFileName().toString();
-                long blocks = countBlocks(order);
-                mc.player.displayClientMessage(Component.literal(
-                    "§d[lens]§r build order '" + name + "' received ("
-                        + blocks + " placements) - control executor lands in v2.1"),
-                    false);
+                try {
+                    BuildOrder parsed = BuildOrder.load(order);
+                    OrderExecutor.submit(parsed);
+                } catch (Exception bad) {
+                    mc.player.displayClientMessage(Component.literal(
+                        "§d[lens]§r build order '" + name + "' unreadable: " + bad),
+                        false);
+                }
                 Path seen = dir.resolve("seen");
                 Files.createDirectories(seen);
                 Files.move(order, seen.resolve(name), StandardCopyOption.REPLACE_EXISTING);
-                PaperclipLens.LOG.info("build order acknowledged: {} ({} blocks)",
-                    name, blocks);
+                PaperclipLens.LOG.info("build order ingested: {}", name);
             }
         } catch (IOException e) {
             PaperclipLens.LOG.warn("orders poll failed: {}", e.toString());
-        }
-    }
-
-    /** Cheap count of placement entries without a full JSON parse. */
-    private static long countBlocks(Path file) {
-        try {
-            String text = Files.readString(file);
-            long count = 0;
-            int idx = -1;
-            while ((idx = text.indexOf("\"b\"", idx + 1)) != -1) count++;
-            return count;
-        } catch (IOException e) {
-            return 0;
         }
     }
 }

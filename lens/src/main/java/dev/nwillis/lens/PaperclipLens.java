@@ -26,11 +26,17 @@ public class PaperclipLens {
 
         modBus.addListener(TurtleEsp::registerKeys);
         modBus.addListener(WorldModel::registerKeys);
+        modBus.addListener(OrderExecutor::registerKeys);
+        modBus.addListener(BlockBlame::registerKeys);
         NeoForge.EVENT_BUS.addListener(TooltipHandler::onTooltip);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onClientTick);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(WorldModel::onClientTick);
         NeoForge.EVENT_BUS.addListener(ControlOrders::onClientTick);
+        NeoForge.EVENT_BUS.addListener(OrderExecutor::onClientTick);
+        NeoForge.EVENT_BUS.addListener(OrderExecutor::onRenderLevel);
+        NeoForge.EVENT_BUS.addListener(BlockBlame::onClientTick);
+        NeoForge.EVENT_BUS.addListener(MaterialsHud::onRenderGui);
         LOG.info("Paperclip Lens up; the factory is watching back");
     }
 }
