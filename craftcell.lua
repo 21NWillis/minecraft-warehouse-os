@@ -71,12 +71,25 @@ local function runJob(job)
   end
   for _, t in ipairs(transfers) do
     turtle.select(t.from)
-    turtle.transferTo(t.to, t.count)
+    if not turtle.transferTo(t.to, t.count) then
+      clearAll()
+      return false, ("transfer %d->%d blocked"):format(t.from, t.to)
+    end
   end
   for _, slot in ipairs(clears) do
     if turtle.getItemCount(slot) > 0 then
       turtle.select(slot)
       turtle.dropDown()
+    end
+  end
+  -- verify the formed grid before crafting: exact item and count in
+  -- every mapped slot, nothing anywhere else
+  for g, item in pairs(job.grid) do
+    local slot = hub.turtleSlot(g)
+    local d = turtle.getItemDetail(slot)
+    if not d or d.name ~= item or d.count ~= job.count then
+      clearAll()
+      return false, ("grid verify failed at slot %d"):format(slot)
     end
   end
   turtle.select(16)

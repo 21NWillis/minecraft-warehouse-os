@@ -54,45 +54,72 @@ end
 function hub.arrangePlan(inv, grid, count)
   local avail = {}
   for slot, d in pairs(inv) do
-    if d then
+    if d and d.count > 0 then
       avail[slot] = { name = d.name, count = d.count }
     end
   end
   local transfers = {}
-  local gridSlots = {}
-  -- satisfy each grid position
+  local wantAt = {}   -- destination turtle slot -> required item
   for g, item in pairs(grid) do
-    local dest = hub.turtleSlot(g)
-    gridSlots[dest] = true
-    local need = count
-    -- already-correct content in the destination counts first
-    local d = avail[dest]
-    if d and d.name == item then
-      local keep = math.min(d.count, need)
-      need = need - keep
-      d.count = d.count - keep
-      d.keep = (d.keep or 0) + keep
+    wantAt[hub.turtleSlot(g)] = item
+  end
+  local function freeSlot()
+    for s = 1, 16 do
+      if not wantAt[s] and (not avail[s] or avail[s].count == 0) then
+        return s
+      end
     end
+  end
+  -- PHASE A - evict: every grid destination is reduced to AT MOST
+  -- `count` of exactly its required item; everything else moves to a
+  -- scratch slot first. This breaks transfer cycles (a destination is
+  -- never blocked by foreign items when phase B fills it) and keeps
+  -- surplus out of the grid (clears would otherwise drop it wholesale
+  -- from a grid slot - turtle drops empty the WHOLE slot).
+  for dest, item in pairs(wantAt) do
+    local d = avail[dest]
+    if d and d.count > 0 then
+      local keep = (d.name == item) and math.min(d.count, count) or 0
+      local excess = d.count - keep
+      if excess > 0 then
+        local scratch = freeSlot()
+        if not scratch then return nil, "no scratch slot free" end
+        transfers[#transfers + 1] = { from = dest, to = scratch, count = excess }
+        avail[scratch] = { name = d.name, count = excess }
+        d.count = keep
+        if keep > 0 then d.name = item end
+      end
+    end
+  end
+  -- PHASE B - fill: satisfy each destination's deficit from non-grid
+  -- slots (all surplus lives outside the grid after phase A)
+  for dest, item in pairs(wantAt) do
+    local d = avail[dest]
+    local held = (d and d.name == item) and d.count or 0
+    local need = count - held
     if need > 0 then
       for slot, s in pairs(avail) do
         if need <= 0 then break end
-        if slot ~= dest and s.name == item and s.count > 0 then
+        if not wantAt[slot] and s.name == item and s.count > 0 then
           local take = math.min(s.count, need)
           transfers[#transfers + 1] = { from = slot, to = dest, count = take }
           s.count = s.count - take
           need = need - take
+          if d then
+            d.name, d.count = item, d.count + take
+          else
+            avail[dest] = { name = item, count = take }
+            d = avail[dest]
+          end
         end
       end
     end
     if need > 0 then return nil, item end
   end
-  -- everything not part of the finished grid must be cleared
+  -- clears: only non-grid slots ever get dropped
   local clears = {}
   for slot, s in pairs(avail) do
-    local residue = s.count
-    if residue and residue > 0 then
-      clears[#clears + 1] = slot
-    elseif not gridSlots[slot] and (s.keep or 0) > 0 then
+    if not wantAt[slot] and s.count > 0 then
       clears[#clears + 1] = slot
     end
   end
