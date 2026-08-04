@@ -71,19 +71,26 @@ At thousands of harvests/hr, durability hoes die in minutes, and
 satisfies the pylon's unbreakable-tool automation rule. One per bay,
 crafted off Errot's supremium autocrafting line.
 
-## Storage spine (user's architecture, ratified)
+## Storage spine (v2 - the omega single-chest design)
 
-1. Per-bay buffer: SS chest with stack upgrades above the pylon.
-2. pipez ultimate trunk: all bay chests -> the farm drawer bank.
-3. **Functional Storage drawer bank + its own Storage Controller**,
-   fronted into ME by a **single Storage Bus on the controller** at
-   high priority: one drawer per essence, one per seed type.
-4. Seed drawers get **void upgrades** after a 2-stack buffer (spares
-   for expansion; the rest is entropy).
+Omega stack upgrades collapsed the whole drawer bank into one chest:
+
+1. Per-bay buffer: SS chest (omega stack upgrade) above each pylon -
+   structurally required (pylons output UP only), functionally never
+   full.
+2. pipez ultimate trunk: all bay chests -> **ONE omega-stacked double
+   chest at the plant**, chained down THROUGH THE ROOF into the
+   existing warehouse SS controller network. No drawer bank, no second
+   controller, no storage bus, no void upgrades - the plant's entire
+   output is warehouse-visible the moment it lands.
+3. BISECT RULE STILL APPLIES: pipez must point AT the chest block
+   itself - never insert via the controller (it silently refuses
+   automation inserts once matching stacks cap).
+4. Seeds accumulate in the same chest (omega stacks absorb them);
+   skim spares for expansion, condense the rest whenever.
 5. Conversion lane: essence -> resource crafts (JEI is authority on
-   ratios per resource), then **compacting drawers** for final items
-   (ingot/block/nugget). Inferium tier-ups ride Errot's supremium
-   autocrafting until our own ME crafting CPUs exist.
+   ratios). Inferium tier-ups ride Errot's supremium autocrafting
+   until our own ME crafting CPUs exist.
 
 ## Field checks before committing the build
 
