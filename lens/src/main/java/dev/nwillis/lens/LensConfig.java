@@ -30,6 +30,17 @@ public final class LensConfig {
     /** ESP starts enabled? (toggle key works regardless) */
     public boolean espOnByDefault = false;
 
+    /**
+     * World model bounds (two [x,y,z] corners, any order). null = the
+     * model/journal/snapshot system stays idle. Cover the tower + campus.
+     */
+    public int[] baseMin = null;
+    public int[] baseMax = null;
+    /** Dimension the model watches. */
+    public String modelDimension = "minecraft:overworld";
+    /** Sweep rate: blocks diffed per client tick (20/s). */
+    public int sweepBlocksPerTick = 20000;
+
     public static LensConfig load(Path configDir) {
         Path file = configDir.resolve("paperclip_lens.json");
         try {

@@ -25,9 +25,12 @@ public class PaperclipLens {
         StockIndex.start(CONFIG.stockUrl, CONFIG.stockPollSeconds);
 
         modBus.addListener(TurtleEsp::registerKeys);
+        modBus.addListener(WorldModel::registerKeys);
         NeoForge.EVENT_BUS.addListener(TooltipHandler::onTooltip);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onClientTick);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onRenderLevel);
+        NeoForge.EVENT_BUS.addListener(WorldModel::onClientTick);
+        NeoForge.EVENT_BUS.addListener(ControlOrders::onClientTick);
         LOG.info("Paperclip Lens up; the factory is watching back");
     }
 }

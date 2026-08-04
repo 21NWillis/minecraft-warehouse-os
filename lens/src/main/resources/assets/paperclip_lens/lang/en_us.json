@@ -1,4 +1,5 @@
 {
   "key.categories.paperclip_lens": "Paperclip Lens",
-  "key.paperclip_lens.esp": "Toggle turtle ESP"
+  "key.paperclip_lens.esp": "Toggle turtle ESP",
+  "key.paperclip_lens.snapshot": "Dump world model snapshot"
 }
