@@ -330,9 +330,12 @@ local function run(t, opts)
   -- kits; a "missing" may just mean another shard is mid-kit. Retry.
   local function kitRetry(bom, label)
     local okKit, kerr
-    for _ = 1, opts.retries or 1 do
+    for attempt = 1, opts.retries or 1 do
       okKit, kerr = kit(bom)
       if okKit or not tostring(kerr):find("missing") then break end
+      if opts.say then
+        opts.say(("waiting on: %s (attempt %d)"):format(tostring(kerr), attempt))
+      end
       if opts.sleep then opts.sleep(20) end
     end
     if not okKit then return false, label .. ": " .. tostring(kerr) end
@@ -510,6 +513,7 @@ end
 local ok, err = run(turtle, {
   base = base, shard = shard, of = of, resume = resume,
   retries = 10, sleep = function(s) os.sleep(s) end,
+  say = function(msg) print(msg) end,
   wrap = function(side) return peripheral.wrap(side) end,
   report = function(k, key) print(("bay %d: %s"):format(k, key)) end,
   onProgress = function(phase, i, n)
