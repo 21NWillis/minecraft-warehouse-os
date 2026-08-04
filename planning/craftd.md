@@ -88,6 +88,37 @@ never rewrite. (Yes, this is a warp scheduler with specialized
 kernels; the lease queue is the atomic; a turtle eating its own
 staging chest is warp divergence. The metaphor is load-bearing.)
 
+## Mobile jobs: the datum closes the loop (user doctrine)
+
+Stationary cells consume in place; MOBILE jobs (build, quarry, survey,
+explore) are the same queue with one extra contract: the consumer
+first paths to the GOLD DATUM, normalizes pose there, then executes
+the job in datum-frame coordinates - exactly the launch convention
+already decreed for humans, now a machine protocol. Every existing
+program (printfit, quarry, survey, builder) becomes a job type the
+moment it reads its target from a job payload instead of argv.
+Spec/gen split heuristic: generalist by default; specialize ONLY
+where hardware pins it (catalyst-holding cells, T1 crafter banks,
+machine-adjacent cells, dock geometry).
+
+## Fleet nursery (kills the floppy-boot chore)
+
+Turtles can place turtles. A nursery station: one turtle with a stack
+of blank crafty turtles + a disk drive holding the provisioning
+floppy (provision.lua exists) + a fuel chest. It places a newborn on
+the boot spot; newborn boots from floppy, self-installs from GitHub,
+sucks fuel, registers with the dispatcher, flies to fleet parking;
+nursery places the next. Fleet growth becomes a chest you refill.
+
+## LLM-in-the-loop, correctly placed
+
+Runtime needs no LLM: machine recipes are datapack JSONs like
+everything else - compile Mekanism/furnace/etc. recipe types INTO
+recipedb with capability tags, and the existing planner plans
+THROUGH machines deterministically. The LLM's seat is the compiler:
+authoring drivers and recipe importers from mod data dumps offline
+(this is literally what tonight already was, eleven times).
+
 ## Verdict vs AE2 crafting
 
 AE2 assemblers/patterns: skipped entirely. Storage bus + terminals
