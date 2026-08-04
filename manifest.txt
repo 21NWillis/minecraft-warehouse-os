@@ -76,3 +76,6 @@ craftd.lua
 gunfit.lua
 craftui.lua
 nursery.lua
+basewalk.lua
+data/basewalk_campus.lua
+data/tour_campus.lua
