@@ -1,6 +1,6 @@
--- headless printfit v2 test: datum-launch flight, feeder docking, the
--- kit protocol, whole-plant build, and 2-shard partition - all against
--- a shared mock world (roof + feeder at the convention position).
+-- headless printfit v3 test: datum-frame plant east of the warehouse,
+-- feeder behind the datum, solar-safety (no roof-column overhang),
+-- access tower + catwalk, kit protocol, 2-shard partition, resume.
 package.path = "./?.lua;" .. package.path
 _TEST = true
 local M = require("printfit")
@@ -14,26 +14,24 @@ end
 local I = M.ITEMS
 local BASE = "minecraft:cobbled_deepslate"
 local function key(x, y, z) return x .. "," .. y .. "," .. z end
--- plant-local -> mock/datum: local +z = east(+x), local +x = south(-z),
--- local y0 = standing-on-roof level (mock y9)
-local function L(lx, ly, lz) return key(28 + lz, 9 + ly, -5 - lx) end
 
 -- ------------------------------------------------------------- geometry
 local bay1 = M.genBay(1, BASE)
 check("bay: step count", #bay1 == 121 + 39 + 1 + 76 + 5 + 1 + 4 + 1 + 76, #bay1)
-local sandbox = M.genBay(10, BASE)
 local sandboxCrops = 0
-for _, s in ipairs(sandbox) do if s.crop then sandboxCrops = sandboxCrops + 1 end end
+for _, s in ipairs(M.genBay(10, BASE)) do
+  if s.crop then sandboxCrops = sandboxCrops + 1 end
+end
 check("bay: sandbox is unplanted", sandboxCrops == 0, sandboxCrops)
 
 local dry = nil
-for z = 1, 9 do
-  for x = 1, 9 do
+for row = 1, 9 do
+  for col = 1, 9 do
     local near = false
     for _, w in ipairs(M.WATERS) do
-      if math.max(math.abs(x - w[1]), math.abs(z - w[2])) <= 4 then near = true end
+      if math.max(math.abs(col - w[1]), math.abs(row - w[2])) <= 4 then near = true end
     end
-    if not near then dry = x .. "," .. z end
+    if not near then dry = col .. "," .. row end
   end
 end
 check("bay: every bed cell hydrated", dry == nil, dry)
@@ -48,13 +46,34 @@ for k = 1, 10 do
 end
 check("bay: BOM fits 16 slots", worstSlots <= 16, worstSlots)
 
-local cols, dupCol = {}, nil
-for _, d in ipairs(M.DOCKS) do
-  local ck = d.col.x .. "," .. d.col.z
-  if cols[ck] then dupCol = ck end
-  cols[ck] = true
+-- SOLAR SAFETY (static): no bay step touches a warehouse roof column
+-- (x 10..28, z -6..6); only the access tower may, at its two columns
+local overhang = nil
+for k = 1, 10 do
+  for _, s in ipairs(M.genBay(k, BASE)) do
+    local x, z = s.stand[1], s.stand[3]
+    if x >= 10 and x <= 28 and z >= -6 and z <= 6 then overhang = k .. ":" .. x .. "," .. z end
+  end
 end
-check("docks: landing columns disjoint", dupCol == nil, dupCol)
+check("solar: no bay overhangs the roof", overhang == nil, overhang)
+local towerBad = nil
+for _, s in ipairs(M.genAccess(BASE)) do
+  local x, z = s.stand[1], s.stand[3]
+  if x >= 10 and x <= 28 and z >= -6 and z <= 6 then
+    if not (z == M.TOWER.z and x >= M.TOWER.x - 2 and x <= M.TOWER.x) then
+      towerBad = x .. "," .. z
+    end
+  end
+end
+check("solar: access touches only its own columns", towerBad == nil, towerBad)
+
+local dockCells, dupDock = {}, nil
+for _, d in ipairs(M.DOCKS) do
+  local ck = table.concat(d.at, ",")
+  if dockCells[ck] then dupDock = ck end
+  dockCells[ck] = true
+end
+check("docks: cells disjoint", dupDock == nil, dupDock)
 
 -- ------------------------------------------------------------ mock rig
 local function isFarmland(n) return n:find("_farmland", 1, true) ~= nil end
@@ -62,11 +81,15 @@ local function isSeed(n) return n:find("_seeds", 1, true) ~= nil end
 
 local function newWorld(pack)
   local world = {}
-  for x = 24, 28 do
-    for z = -8, -3 do world[key(x, 8, z)] = "roof" end
+  for x = -8, 8 do
+    for z = -8, 8 do world[key(x, -1, z)] = "pad" end
   end
-  world[key(27, 9, -5)] = "feeder"
-  return { world = world, pack = pack }
+  for x = 10, 28 do
+    for z = -6, 6 do world[key(x, 8, z)] = "roof" end
+  end
+  world[key(27, 9, -5)] = "solar_gen"    -- the power stuff is here
+  world[key(0, 0, -1)] = "feeder"        -- right behind the datum
+  return { world = world, pack = pack, placed = {} }
 end
 
 local function newTurtle(sh, opts)
@@ -85,13 +108,13 @@ local function newTurtle(sh, opts)
   local function isFeeder(k) return sh.world[k] == "feeder" end
   local function packSuck()
     if #sh.pack == 0 then return false end
-    local slot = nil
     for s = 1, 16 do
-      if not m.inv[s] then slot = s break end
+      if not m.inv[s] then
+        m.inv[s] = table.remove(sh.pack, 1)
+        return true
+      end
     end
-    if not slot then return false end
-    m.inv[slot] = table.remove(sh.pack, 1)
-    return true
+    return false
   end
   local function packDrop()
     local d = m.inv[m.sel]
@@ -107,17 +130,32 @@ local function newTurtle(sh, opts)
     m.fuel = m.fuel - 1
     return true
   end
+  local function placeInto(tk, name)
+    sh.world[tk] = name
+    sh.placed[tk] = name
+  end
   m.ops = {
     forward = function() return move(DIRS[m.f][1], 0, DIRS[m.f][2]) end,
     up = function() return move(0, 1, 0) end,
     down = function() return move(0, -1, 0) end,
     turnLeft = function() m.f = (m.f - 1) % 4 return true end,
     turnRight = function() m.f = (m.f + 1) % 4 return true end,
+    detect = function() return solid(facedKey()) end,
     detectDown = function() return solid(belowKey()) end,
     suck = function() return isFeeder(facedKey()) and packSuck() or false end,
     suckDown = function() return isFeeder(belowKey()) and packSuck() or false end,
     drop = function() return isFeeder(facedKey()) and packDrop() or false end,
     dropDown = function() return isFeeder(belowKey()) and packDrop() or false end,
+    place = function()
+      local d = m.inv[m.sel]
+      if not d then return false end
+      local tk = facedKey()
+      if sh.world[tk] then return false end
+      placeInto(tk, d.name)
+      d.count = d.count - 1
+      if d.count <= 0 then m.inv[m.sel] = nil end
+      return true
+    end,
     placeDown = function()
       local d = m.inv[m.sel]
       if not d then return false end
@@ -129,27 +167,27 @@ local function newTurtle(sh, opts)
       end
       if d.name == I.BUCKET then
         if sh.world[tk] then return false end
-        sh.world[tk] = "water"
+        placeInto(tk, "water")
         m.inv[m.sel] = { name = I.EMPTY_BUCKET, count = 1 }
         return true
       elseif d.name == I.LILYPAD then
         if sh.world[tk] or sh.world[below] ~= "water" then return false end
-        sh.world[tk] = d.name
+        placeInto(tk, d.name)
         consume()
         return true
       elseif isSeed(d.name) then
         if sh.world[tk] or not (sh.world[below] and isFarmland(sh.world[below])) then return false end
-        sh.world[tk] = "crop:" .. d.name
+        placeInto(tk, "crop:" .. d.name)
         consume()
         return true
       elseif d.name == I.PYLON then
         if solid(tk) then return false end
-        sh.world[tk] = d.name
+        placeInto(tk, d.name)
         consume()
         return true
       else
         if sh.world[tk] then return false end
-        sh.world[tk] = d.name
+        placeInto(tk, d.name)
         consume()
         return true
       end
@@ -170,8 +208,6 @@ local function newTurtle(sh, opts)
   return m
 end
 
--- feeder manifest: padded one extra stack per farmland tier (the
--- sharding strand buffer the parts list calls for)
 local function manifest()
   local pack = {}
   local function add(name, count, stacks)
@@ -190,46 +226,24 @@ local function manifest()
   add("cyclic:user", 10, 1)
   add("sophisticatedstorage:chest", 10, 1)
   add(I.LILYPAD, 40, 1)
+  add(I.LADDER, 6, 1)
   add(I.BUCKET, 1, 55)
-  add(BASE, 64, 27)
+  add(BASE, 64, 28)
   return pack
 end
 
-local function dockPose(shard)
-  local d = M.DOCKS[shard]
-  return { x = d.at[1], y = d.at[2], z = d.at[3], f = 0 }
-end
-
--- ------------------------------------------------------------- launch
-local sh = newWorld(manifest())
-local t1 = newTurtle(sh)
-local okL, lerr = M.launch(t1.ops, 1)
-check("launch: shard 1 reaches its column", okL == true, tostring(lerr))
-check("launch: hovers above the feeder",
-  t1.x == 27 and t1.y == 10 and t1.z == -5 and t1.f == 1,
-  ("at %d,%d,%d f%d"):format(t1.x, t1.y, t1.z, t1.f))
-
--- ------------------------------------------------- full plant, 1 turtle
-local ok, err = M.run(t1.ops, { base = BASE, shard = 1, of = 1, pose = dockPose(1) })
-check("sim: plant completes", ok == true, tostring(err))
-check("sim: parks at dock", t1.x == 27 and t1.y == 10 and t1.z == -5,
-  ("at %d,%d,%d"):format(t1.x, t1.y, t1.z))
-local emptyInv = true
-for s = 1, 16 do if t1.inv[s] then emptyInv = false end end
-check("sim: change returned to feeder", emptyInv)
-
 local function verifyPlant(world)
   for k = 1, 10 do
-    local z0 = M.BAY_Z(k)
+    local px = M.BAY_X(k)
     local bay = M.BAYS[k]
-    if world[L(5, 0, z0 + 5)] ~= I.PYLON then return k .. ":pylon" end
-    if world[L(5, 1, z0 + 5)] ~= "sophisticatedstorage:chest" then return k .. ":chest" end
-    if world[L(5, 0, z0)] ~= "cyclic:user" then return k .. ":user" end
+    if world[key(px + 5, 14, 0)] ~= I.PYLON then return k .. ":pylon" end
+    if world[key(px + 5, 15, 0)] ~= "sophisticatedstorage:chest" then return k .. ":chest" end
+    if world[key(px + 5, 14, M.Z0)] ~= "cyclic:user" then return k .. ":user" end
     local farm, crops, pads = 0, 0, 0
-    for z = 1, 9 do
-      for x = 1, 9 do
-        if world[L(x, 0, z0 + z)] == bay.farmland then farm = farm + 1 end
-        local up = world[L(x, 1, z0 + z)]
+    for row = 1, 9 do
+      for col = 1, 9 do
+        if world[key(px + row, 14, M.Z0 + col)] == bay.farmland then farm = farm + 1 end
+        local up = world[key(px + row, 15, M.Z0 + col)]
         if up and up:find("^crop:") then crops = crops + 1 end
         if up == I.LILYPAD then pads = pads + 1 end
       end
@@ -237,28 +251,61 @@ local function verifyPlant(world)
     if farm ~= 76 then return k .. ":farmland=" .. farm end
     if pads ~= 4 then return k .. ":pads=" .. pads end
     if crops ~= (bay.seed and 76 or 0) then return k .. ":crops=" .. crops end
-    for i = 2, 5 do
-      local w = M.WATERS[i]
-      if world[L(w[1], 0, z0 + w[2])] ~= "water" then return k .. ":water" end
-    end
   end
   return nil
 end
+
+-- ------------------------------------------------- full plant, 1 turtle
+local sh = newWorld(manifest())
+local t1 = newTurtle(sh)
+local ok, err = M.run(t1.ops, { base = BASE, shard = 1, of = 1 })
+check("sim: plant completes", ok == true, tostring(err))
+check("sim: parks at its dock", t1.x == 0 and t1.y == 1 and t1.z == -1,
+  ("at %d,%d,%d"):format(t1.x, t1.y, t1.z))
+local emptyInv = true
+for s = 1, 16 do if t1.inv[s] then emptyInv = false end end
+check("sim: change returned to feeder", emptyInv)
 check("sim: all 10 bays correct", verifyPlant(sh.world) == nil, verifyPlant(sh.world))
+
+-- solar safety (dynamic): nothing placed in a roof column outside the
+-- tower's own two columns; the solar gen block is untouched
+local shadow = nil
+for k in pairs(sh.placed) do
+  local x, y, z = k:match("(-?%d+),(-?%d+),(-?%d+)")
+  x, z = tonumber(x), tonumber(z)
+  if x >= 10 and x <= 28 and z >= -6 and z <= 6 then
+    if not (z == M.TOWER.z and (x == M.TOWER.x or x == M.TOWER.x - 1)) then
+      shadow = k
+    end
+  end
+end
+check("solar: no placement shades the roof", shadow == nil, shadow)
+check("solar: gen untouched", sh.world[key(27, 9, -5)] == "solar_gen")
+
+-- access: tower pillar, ladders, bridge, catwalk
+check("access: pillar tops at rim level", sh.world[key(M.TOWER.x, 14, M.TOWER.z)] == BASE)
+local ladders = 0
+for y = 9, 14 do
+  if sh.world[key(M.TOWER.x - 1, y, M.TOWER.z)] == I.LADDER then ladders = ladders + 1 end
+end
+check("access: ladder column complete", ladders == 6, ladders)
+check("access: bridge to bay 1", sh.world[key(M.TOWER.x + 1, 14, M.TOWER.z)] == BASE)
+local links = 0
+for k = 1, 9 do
+  if sh.world[key(M.BAY_X(k) + 11, 14, M.Z0)] == BASE then links = links + 1 end
+end
+check("access: catwalk links all gaps", links == 9, links)
 
 -- --------------------------------------------------- 2-shard partition
 local sh2 = newWorld(manifest())
 local tA = newTurtle(sh2)
-local okA = M.launch(tA.ops, 1)
-local okA2, errA = M.run(tA.ops, { base = BASE, shard = 1, of = 2, pose = dockPose(1) })
-check("shards: A (odd bays) completes", okA and okA2 == true, tostring(errA))
+local okA, errA = M.run(tA.ops, { base = BASE, shard = 1, of = 2 })
+check("shards: A (odd bays + access) completes", okA == true, tostring(errA))
 local tB = newTurtle(sh2)
-local okB = M.launch(tB.ops, 2)
-check("shards: B lands on its own column",
-  okB and tB.x == 28 and tB.y == 9 and tB.z == -5,
+local okB, errB = M.run(tB.ops, { base = BASE, shard = 2, of = 2 })
+check("shards: B (even bays) completes", okB == true, tostring(errB))
+check("shards: B parks at its own dock", tB.x == 0 and tB.y == 0 and tB.z == -2,
   ("at %d,%d,%d"):format(tB.x, tB.y, tB.z))
-local okB2, errB = M.run(tB.ops, { base = BASE, shard = 2, of = 2, pose = dockPose(2) })
-check("shards: B (even bays) completes", okB2 == true, tostring(errB))
 check("shards: union builds the whole plant", verifyPlant(sh2.world) == nil,
   verifyPlant(sh2.world))
 
@@ -269,29 +316,25 @@ for _, s in ipairs(manifest()) do
 end
 local sh3 = newWorld(shortPack)
 local t3 = newTurtle(sh3)
-M.launch(t3.ops, 1)
-local ok3, err3 = M.run(t3.ops, { base = BASE, shard = 1, of = 1, pose = dockPose(1) })
+local ok3, err3 = M.run(t3.ops, { base = BASE, shard = 1, of = 1 })
 check("sim: missing item reported", ok3 == false and err3:find("missing") ~= nil, tostring(err3))
 check("sim: missing item names the culprit", tostring(err3):find("harvester_pylon") ~= nil, err3)
 
 -- --------------------------------------------------------- crash resume
 local sh4 = newWorld(manifest())
 local t4 = newTurtle(sh4)
-M.launch(t4.ops, 1)
 local crashed = false
 local okP = pcall(function()
-  M.run(t4.ops, { base = BASE, shard = 1, of = 1, pose = dockPose(1),
+  M.run(t4.ops, { base = BASE, shard = 1, of = 1,
     onProgress = function(phase, i)
       if phase:find("bay 2") and i == 50 then crashed = true; error("simulated crash") end
     end })
 end)
 check("sim: crash mid-bay-2 simulated", okP == false and crashed)
--- field ritual: same turtle re-placed on the datum, relaunches, resumes
-t4.x, t4.y, t4.z, t4.f = 0, 0, 0, 0
-local okR = M.launch(t4.ops, 1)
-local ok4, err4 = M.run(t4.ops, { base = BASE, shard = 1, of = 1, pose = dockPose(1),
+t4.x, t4.y, t4.z, t4.f = 0, 0, 0, 0   -- re-placed on the datum
+local ok4, err4 = M.run(t4.ops, { base = BASE, shard = 1, of = 1,
   resume = { bay = 2, step = 51 } })
-check("sim: resume completes", okR and ok4 == true, tostring(err4))
+check("sim: resume completes", ok4 == true, tostring(err4))
 check("sim: resumed plant fully correct", verifyPlant(sh4.world) == nil,
   verifyPlant(sh4.world))
 

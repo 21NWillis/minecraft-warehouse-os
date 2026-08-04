@@ -1,33 +1,38 @@
--- printfit v2: DATUM-LAUNCHED, SHARDABLE Item Printer plant builder.
+-- printfit v3: datum-launched, shardable, SOLAR-SAFE Item Printer.
 -- Design: planning/item_printer.md
 --
--- THE CORP LAUNCH CONVENTION (all future fitters follow this): every
--- turtle starts ON THE GOLD DATUM facing campus north (+z, go-forward
--- test), with a stack of coal loaded by hand. Programs fly themselves
--- to their site. One ritual, any turtle, any job.
+-- THE CORP LAUNCH CONVENTION: turtle ON THE GOLD DATUM facing campus
+-- north, a stack of coal loaded by hand, FEEDER (stocked backpack or
+-- omega chest) placed DIRECTLY BEHIND THE DATUM on the pad deck.
+-- That's the whole ritual, for every shard.
 --
--- FEEDER: place the item source (backpack or omega chest, stocked per
--- the manifest) ON THE WAREHOUSE ROOF at its SOUTHEAST corner column -
--- datum-frame (x=27, z=-5), sitting on the roof. The plant row builds
--- EAST from there, pods floating past the roof edge.
+-- SITE: the plant floats at y14, ENTIRELY EAST of the warehouse - no
+-- column overhangs the roof, because Mekanism solars need an
+-- unobstructed sky column (elevation does NOT help; overhang at any
+-- height blocks them). Pods: 11x11, bay k at x = 30+(k-1)*12, spanning
+-- z -5..5. Slab y13, rim/bed y14, crops y15.
+--
+-- ACCESS (built by shard 1 after its bays): ladder tower on the
+-- warehouse roof's NORTHEAST corner (x28, z4) up to y14, bridge onto
+-- bay 1's rim, and catwalk blocks linking every pod's south rim.
+-- If your roof gear lives at the NE corner too, say so - the tower
+-- position is two constants.
 --
 -- USAGE:
---   printfit                     one turtle builds all 10 bays
---   printfit <shard> <of> [base] sharded: turtle <shard> of <of> builds
---                                bays shard, shard+of, ... (of <= 4)
+--   printfit                     one turtle, all 10 bays + access
+--   printfit <shard> <of> [base] up to 4 shards; shard 1 also builds
+--                                the access tower + catwalk
 --   printfit <base>              single turtle, custom slab block
--- Launch shards ~a minute apart. Each shard docks at its OWN face of
--- the feeder and cruises at its own altitude - no shared airspace.
+-- Launch shards a minute apart. Each has its own feeder dock face and
+-- its own cruise altitude - no shared cells, no shared airspace.
 --
--- Per-bay operator pass (after all shards finish - one walk east):
---   supremium hoe -> pylon, watering can -> item user (aim + delay),
---   omega upgrade -> chest, pipez ultimate chest -> collector chest
---   (POINT AT THE CHEST BLOCK, never a controller).
---
--- FARMLAND TIER GUESSES below: verify each seed's tier in JEI; a wrong
--- guess stops that bay with "missing <farmland>" - fix table, rerun.
--- Crash recovery: printfit.state per turtle stores {bay, step};
--- re-place the turtle on the datum and rerun with the SAME shard args.
+-- Operator pass (after all shards): climb the tower, walk the catwalk:
+-- hoe -> pylon, watering can -> item user (aim + delay), omega
+-- upgrade -> chest, pipez ultimate chest -> collector CHEST (never a
+-- controller). FARMLAND TIER GUESSES in the table: verify in JEI;
+-- wrong guess = clean "missing" stop, fix + rerun.
+-- Crash recovery: printfit.state {bay, step}; re-place on the datum,
+-- rerun with the same shard args.
 local MA = "mysticalagriculture:"
 local BAYS = {
   { key = "inferium", seed = MA .. "inferium_seeds", farmland = MA .. "supremium_farmland" },
@@ -50,65 +55,103 @@ local ITEMS = {
   BUCKET = "minecraft:water_bucket",
   EMPTY_BUCKET = "minecraft:bucket",
   COAL = "minecraft:coal",
+  LADDER = "minecraft:ladder",
 }
 
--- datum-frame flight plan
-local CORRIDOR_Y = 15
-local FEEDER = { x = 27, z = -5 }   -- roof SE corner column
+-- datum-frame geometry
+local FEEDER = { 0, 0, -1 }        -- directly behind the datum
+local X0, Z0, SLAB_Y = 30, -5, 13  -- bay k slab: x X0+(k-1)*12, z Z0..Z0+10
+local TOWER = { x = 28, z = 4 }    -- ladder tower, roof NE corner
+local ROOF_TOP = 8
 
--- plant-local frame: feeder = (0,0,-1), local +z = datum EAST (+x),
--- local +x = datum SOUTH (-z), local y0 = roof-standing level.
--- Docks: each shard kits at its own face of the feeder; landing columns
--- are disjoint so shards never contest a cell.
+-- feeder docks, one per shard: distinct cells around the backpack.
+-- Shard 1 = top (suckDown). The datum cell itself stays free so more
+-- shards can always launch.
 local DOCKS = {
-  { at = { 0, 1, -1 }, vertical = true, col = { x = 27, z = -5 } },  -- top
-  { at = { 0, 0, 0 }, face = 2, col = { x = 28, z = -5 } },          -- east
-  { at = { 0, 0, -2 }, face = 0, col = { x = 26, z = -5 } },         -- west
-  { at = { 1, 0, -1 }, face = 3, col = { x = 27, z = -6 } },         -- south
+  { at = { 0, 1, -1 }, vertical = true },
+  { at = { 0, 0, -2 }, face = 0 },
+  { at = { 1, 0, -1 }, face = 3 },
+  { at = { -1, 0, -1 }, face = 1 },
 }
 
-local BAY_Z = function(k) return 4 + (k - 1) * 12 end
+local BAY_X = function(k) return X0 + (k - 1) * 12 end
 
--- water cells inside a bay's 9x9 bed: center hosts the waterlogged
--- pylon, quadrant waters host lilypads
+-- water cells in bed coords (col=z-ish 1..9, row=x-ish 1..9): center
+-- hosts the waterlogged pylon, quadrants host lilypads
 local WATERS = { { 5, 5 }, { 3, 3 }, { 3, 7 }, { 7, 3 }, { 7, 7 } }
 
+-- one bay: row axis = +x, pod spans z Z0..Z0+10. Item user sits on the
+-- SOUTH rim (z=Z0) where the catwalk runs. All placements placeDown;
+-- stand y = target y + 1.
 local function genBay(k, base)
-  local z0 = BAY_Z(k)
+  local px = BAY_X(k)
   local bay = BAYS[k]
   local steps = {}
   local function S(x, y, z, block, extra)
-    local s = { stand = { x, y, z0 + z }, block = block }
+    local s = { stand = { x, y + 1, z }, block = block }
     if extra then for kk, vv in pairs(extra) do s[kk] = vv end end
     steps[#steps + 1] = s
   end
   local isWater = {}
   for _, w in ipairs(WATERS) do isWater[w[1] .. "," .. w[2]] = true end
-  for z = 0, 10 do
-    for x = 0, 10 do S(x, 0, z, base) end
+  for dx = 0, 10 do
+    for dz = 0, 10 do S(px + dx, SLAB_Y, Z0 + dz, base) end
   end
-  for z = 0, 10 do
-    for x = 0, 10 do
-      local rim = (x == 0 or x == 10 or z == 0 or z == 10)
-      if rim and not (z == 0 and x == 5) then S(x, 1, z, base) end
+  for dx = 0, 10 do
+    for dz = 0, 10 do
+      local rim = (dx == 0 or dx == 10 or dz == 0 or dz == 10)
+      if rim and not (dz == 0 and dx == 5) then S(px + dx, SLAB_Y + 1, Z0 + dz, base) end
     end
   end
-  S(5, 1, 0, ITEMS.USER)
-  for z = 1, 9 do
-    for x = 1, 9 do
-      if not isWater[x .. "," .. z] then S(x, 1, z, bay.farmland) end
-    end
-  end
-  for _, w in ipairs(WATERS) do S(w[1], 1, w[2], ITEMS.BUCKET, { water = true }) end
-  S(5, 1, 5, ITEMS.PYLON, { into_water = true })
-  for i = 2, 5 do S(WATERS[i][1], 2, WATERS[i][2], ITEMS.LILYPAD, { on_water = true }) end
-  S(5, 2, 5, ITEMS.CHEST)
-  if bay.seed then
-    for z = 1, 9 do
-      for x = 1, 9 do
-        if not isWater[x .. "," .. z] then S(x, 2, z, bay.seed, { crop = true }) end
+  S(px + 5, SLAB_Y + 1, Z0, ITEMS.USER)
+  for row = 1, 9 do
+    for col = 1, 9 do
+      if not isWater[col .. "," .. row] then
+        S(px + row, SLAB_Y + 1, Z0 + col, bay.farmland)
       end
     end
+  end
+  for _, w in ipairs(WATERS) do
+    S(px + w[2], SLAB_Y + 1, Z0 + w[1], ITEMS.BUCKET, { water = true })
+  end
+  S(px + 5, SLAB_Y + 1, Z0 + 5, ITEMS.PYLON, { into_water = true })
+  for i = 2, 5 do
+    local w = WATERS[i]
+    S(px + w[2], SLAB_Y + 2, Z0 + w[1], ITEMS.LILYPAD, { on_water = true })
+  end
+  S(px + 5, SLAB_Y + 2, Z0 + 5, ITEMS.CHEST)
+  if bay.seed then
+    for row = 1, 9 do
+      for col = 1, 9 do
+        if not isWater[col .. "," .. row] then
+          S(px + row, SLAB_Y + 2, Z0 + col, bay.seed, { crop = true })
+        end
+      end
+    end
+  end
+  return steps
+end
+
+-- access: tower pillar on the roof NE corner, ladders up its west
+-- face, a bridge block onto bay 1's rim, catwalk links between pods
+local function genAccess(base)
+  local steps = {}
+  local function S(x, y, z, block, extra)
+    local s = { stand = { x, y + 1, z }, block = block }
+    if extra then for kk, vv in pairs(extra) do s[kk] = vv end end
+    steps[#steps + 1] = s
+  end
+  for y = ROOF_TOP + 1, SLAB_Y + 1 do
+    S(TOWER.x, y, TOWER.z, base)
+  end
+  -- ladders: placed forward against the pillar's west face
+  for y = ROOF_TOP + 1, SLAB_Y + 1 do
+    steps[#steps + 1] = { stand = { TOWER.x - 2, y, TOWER.z }, block = ITEMS.LADDER,
+      fwd = true, face = 1 }
+  end
+  S(TOWER.x + 1, SLAB_Y + 1, TOWER.z, base)   -- bridge to bay 1 rim
+  for k = 1, 9 do
+    S(BAY_X(k) + 11, SLAB_Y + 1, Z0, base)    -- catwalk gap links
   end
   return steps
 end
@@ -125,71 +168,43 @@ local function bayBOM(k, base)
   return bom
 end
 
-local FUEL_MIN = 2000
+local function accessBOM(base)
+  local n = (SLAB_Y + 1) - (ROOF_TOP + 1) + 1
+  return { [base] = n + 1 + 9, [ITEMS.LADDER] = n }
+end
+
+-- must cover the worst bay round-trip: ~324 steps at the highest shard
+-- cruise plus the flight to bay 10 - measured ~4.5k, floor at 6k
+local FUEL_MIN = 6000
 local KIT_LIMIT = 400
 
--- pose helpers shared by launch (datum frame) and run (plant frame):
--- both just count the same physical turns/moves
-local function navKit(t, pose)
+-- opts: base, shard, of, resume {bay, step}, onProgress, onBayDone,
+-- report. Pose starts ON THE DATUM (0,0,0) facing north.
+local function run(t, opts)
+  local base = opts.base
+  local shard, of = opts.shard or 1, opts.of or 1
+  local dock = DOCKS[shard]
+  local CRUISE = SLAB_Y + 4 + (shard - 1)   -- private altitude per shard
+  local pose = opts.pose or { x = 0, y = 0, z = 0, f = 0 }
   local DIRS = { [0] = { 0, 1 }, [1] = { 1, 0 }, [2] = { 0, -1 }, [3] = { -1, 0 } }
-  local n = {}
-  function n.face(target)
+
+  local function face(target)
     while pose.f ~= target do
       if (target - pose.f) % 4 == 3 then t.turnLeft(); pose.f = (pose.f + 3) % 4
       else t.turnRight(); pose.f = (pose.f + 1) % 4 end
     end
   end
-  function n.vmove(up)
+  local function vmove(up)
     local ok = up and t.up() or t.down()
     if ok then pose.y = pose.y + (up and 1 or -1) end
     return ok
   end
-  function n.fwd()
+  local function fwd()
     if not t.forward() then return false end
     pose.x = pose.x + DIRS[pose.f][1]
     pose.z = pose.z + DIRS[pose.f][2]
     return true
   end
-  return n
-end
-
--- fly datum -> corridor -> this shard's landing column -> descend onto
--- the roof/feeder. Returns true on success; ends facing datum east.
-local function launch(t, shard)
-  local pose = { x = 0, y = 0, z = 0, f = 0 }
-  local n = navKit(t, pose)
-  local col = DOCKS[shard].col
-  while pose.y < CORRIDOR_Y do
-    if not n.vmove(true) then return false, "blocked rising off the datum" end
-  end
-  n.face(1)
-  while pose.x < col.x do
-    if not n.fwd() then return false, "blocked in the corridor (east leg)" end
-  end
-  n.face(col.z < 0 and 2 or 0)
-  while pose.z ~= col.z do
-    if not n.fwd() then return false, "blocked in the corridor (south leg)" end
-  end
-  while not t.detectDown() do
-    if not n.vmove(false) then return false, "blocked descending to the roof" end
-  end
-  n.face(1)   -- datum east = plant-local +z
-  return true
-end
-
--- opts: base, shard (1..4), of (1..4), pose (plant-local start pose,
--- as landed), resume {bay, step}, onProgress, onBayDone, report
-local function run(t, opts)
-  local base = opts.base
-  local shard, of = opts.shard or 1, opts.of or 1
-  local dock = DOCKS[shard]
-  local CRUISE = 2 + (shard - 1)   -- private altitude per shard
-  local pose = opts.pose or { x = dock.at[1], y = dock.at[2], z = dock.at[3], f = 0 }
-  local n = navKit(t, pose)
-  local face, vmove, fwd = n.face, n.vmove, n.fwd
-  local suckFn = dock.vertical and t.suckDown or t.suck
-  local dropFn = dock.vertical and t.dropDown or t.drop
-
   local function goTo(x, y, z)
     if pose.x == x and pose.y == y and pose.z == z then return true end
     while pose.y < CRUISE do if not vmove(true) then return false end end
@@ -220,6 +235,8 @@ local function run(t, opts)
     return total
   end
 
+  local suckFn = dock.vertical and t.suckDown or t.suck
+  local dropFn = dock.vertical and t.dropDown or t.drop
   local function atDock()
     if not goTo(dock.at[1], dock.at[2], dock.at[3]) then return false end
     if dock.face then face(dock.face) end
@@ -242,12 +259,10 @@ local function run(t, opts)
         if have(name) < want then return name end
       end
     end
-    -- return everything this bay doesn't need (incl. empty buckets)
     for slot = 1, 16 do
       local d = t.getItemDetail(slot)
       if d and not keepable(d.name) then t.select(slot); dropFn() end
     end
-    -- fuel first, carrying nothing but coal
     local rejects = 0
     while t.getFuelLevel() ~= "unlimited" and t.getFuelLevel() < FUEL_MIN do
       if ensure(ITEMS.COAL) then
@@ -266,8 +281,6 @@ local function run(t, opts)
     rejects = 0
     while deficit() > 0 do
       local before = deficit()
-      -- make room BEFORE sucking: strict surplus first, then any stack
-      -- from an already-met line (it cycles back through the feeder)
       local free = false
       for slot = 1, 16 do
         if not t.getItemDetail(slot) then free = true break end
@@ -315,12 +328,20 @@ local function run(t, opts)
       if not goTo(st[1], st[2], st[3]) then
         return false, ("blocked reaching step %d of %s"):format(i, phase)
       end
-      local occupied = t.detectDown()
-      if s.into_water or occupied == false then
-        if not ensure(s.block) then return false, "out of " .. s.block .. " in " .. phase end
-        if not t.placeDown() and not s.water and not s.crop
-            and not s.on_water and not s.into_water then
-          return false, ("cannot place %s at step %d of %s"):format(s.block, i, phase)
+      if s.fwd then
+        face(s.face)
+        if not t.detect() then
+          if not ensure(s.block) then return false, "out of " .. s.block .. " in " .. phase end
+          t.place()
+        end
+      else
+        local occupied = t.detectDown()
+        if s.into_water or occupied == false then
+          if not ensure(s.block) then return false, "out of " .. s.block .. " in " .. phase end
+          if not t.placeDown() and not s.water and not s.crop
+              and not s.on_water and not s.into_water then
+            return false, ("cannot place %s at step %d of %s"):format(s.block, i, phase)
+          end
         end
       end
       if opts.onProgress then opts.onProgress(phase, i, #steps) end
@@ -345,8 +366,17 @@ local function run(t, opts)
     k = k + of
   end
 
-  -- return the change: leftover materials go back into the feeder so
-  -- other shards (and the treasury) get them; park empty at the dock
+  -- shard 1 builds the human access after its bays (tower cells never
+  -- overlap any pod, so other shards can still be mid-build; on resume
+  -- this re-runs harmlessly - existing blocks skip, change returns)
+  if shard == 1 then
+    local okKit, kerr = kit(accessBOM(base))
+    if not okKit then return false, "access: " .. kerr end
+    local okA, aerr = execute(genAccess(base), "access", 1)
+    if not okA then return false, aerr end
+  end
+
+  -- return the change and park empty at the dock
   if atDock() then
     for slot = 1, 16 do
       if t.getItemDetail(slot) then t.select(slot); dropFn() end
@@ -355,9 +385,10 @@ local function run(t, opts)
   return true
 end
 
-local M = { run = run, launch = launch, genBay = genBay, bayBOM = bayBOM,
-  BAYS = BAYS, ITEMS = ITEMS, WATERS = WATERS, BAY_Z = BAY_Z,
-  DOCKS = DOCKS, FEEDER = FEEDER, CORRIDOR_Y = CORRIDOR_Y }
+local M = { run = run, genBay = genBay, genAccess = genAccess, bayBOM = bayBOM,
+  accessBOM = accessBOM, BAYS = BAYS, ITEMS = ITEMS, WATERS = WATERS,
+  BAY_X = BAY_X, DOCKS = DOCKS, X0 = X0, Z0 = Z0, SLAB_Y = SLAB_Y,
+  TOWER = TOWER, ROOF_TOP = ROOF_TOP }
 if _TEST then return M end
 
 -- ==================================================================== program
@@ -375,7 +406,6 @@ if shard < 1 or shard > 4 or of < 1 or of > 4 or shard > of then
   return
 end
 
--- hand-loaded launch fuel: the feeder is a flight away
 for slot = 1, 16 do turtle.select(slot); turtle.refuel(64) end
 turtle.select(1)
 if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 300 then
@@ -384,35 +414,8 @@ if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 300 then
 end
 
 print(("printfit shard %d/%d - base %s"):format(shard, of, base))
-print("launching from the datum...")
-local okL, lerr = launch(turtle, shard)
-if not okL then
-  printError("launch failed: " .. tostring(lerr))
-  return
-end
-
--- verify the feeder is where the convention says
-local dock = DOCKS[shard]
-local probe = dock.vertical and turtle.suckDown or turtle.suck
-local unprobe = dock.vertical and turtle.dropDown or turtle.drop
-if dock.face then
-  local pose0 = { x = dock.at[1], y = dock.at[2], z = dock.at[3], f = 0 }
-  -- landed facing east (local f0); turn to the dock face for the probe
-  local diff = (dock.face - 0) % 4
-  if diff == 1 then turtle.turnRight() elseif diff == 3 then turtle.turnLeft()
-  elseif diff == 2 then turtle.turnRight(); turtle.turnRight() end
-end
-if not probe() then
-  printError("no stocked feeder at my dock - check its placement (roof")
-  printError("SE corner column) and rerun from the datum")
-  return
-end
-unprobe()
-if dock.face then
-  local diff = (0 - dock.face) % 4
-  if diff == 1 then turtle.turnRight() elseif diff == 3 then turtle.turnLeft()
-  elseif diff == 2 then turtle.turnRight(); turtle.turnRight() end
-end
+-- (feeder presence is verified by the first kit: a missing/misplaced
+-- feeder stops with "feeder is missing ..." before anything is built)
 
 local STATE = "printfit.state"
 local resume = nil
@@ -425,7 +428,6 @@ end
 
 local ok, err = run(turtle, {
   base = base, shard = shard, of = of, resume = resume,
-  pose = { x = dock.at[1], y = dock.at[2], z = dock.at[3], f = 0 },
   report = function(k, key) print(("bay %d: %s"):format(k, key)) end,
   onProgress = function(phase, i, n)
     local h = fs.open(STATE, "w")
@@ -444,8 +446,9 @@ local ok, err = run(turtle, {
 if ok then
   if fs.exists(STATE) then fs.delete(STATE) end
   print(("shard %d/%d COMPLETE - parked at my feeder dock."):format(shard, of))
-  print("when all shards report: operator walk east (hoe->pylon,")
-  print("can->user, upgrade->chest, pipez -> collector CHEST)")
+  print("when all shards report: climb the roof-NE tower, walk the")
+  print("catwalk east: hoe->pylon, can->user, upgrade->chest, pipez")
+  print("chest->collector CHEST (never a controller)")
 else
   printError("stopped: " .. tostring(err))
   printError("fix/restock, re-place me on the datum, rerun: printfit "
