@@ -301,7 +301,7 @@ local function manifest()
   end
   add(I.PYLON, 10)
   add("cyclic:user", 10)
-  add("sophisticatedstorage:chest", 10)
+  add("sophisticatedstorage:netherite_chest", 12)
   add(I.LILYPAD, 40)
   add(I.LADDER, 6)
   for _ = 1, 55 do add(I.BUCKET, 1) end
@@ -317,7 +317,7 @@ local function verifyPlant(world)
     local px = M.BAY_X(k)
     local bay = M.BAYS[k]
     if world[key(px + 5, 14, 0)] ~= I.PYLON then return k .. ":pylon" end
-    if world[key(px + 5, 15, 0)] ~= "sophisticatedstorage:chest" then return k .. ":chest" end
+    if world[key(px + 5, 15, 0)] ~= "sophisticatedstorage:netherite_chest" then return k .. ":chest" end
     if world[key(px + 5, 14, M.Z0)] ~= "cyclic:user" then return k .. ":user" end
     local farm, crops, pads = 0, 0, 0
     for row = 1, 9 do
