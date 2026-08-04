@@ -21,7 +21,12 @@ local function key(x, y, z) return x .. "," .. y .. "," .. z end
 
 -- ------------------------------------------------------------- geometry
 local bay1 = M.genBay(1, BASE)
-check("bay: step count", #bay1 == 121 + 39 + 1 + 76 + 5 + 1 + 4 + 1 + 76, #bay1)
+check("bay: step count", #bay1 == 121 + 39 + 1 + 5 + 1 + 4 + 1 + 76, #bay1)
+local farmlandSteps = 0
+for _, s in ipairs(bay1) do
+  if s.block and s.block:find("_farmland", 1, true) then farmlandSteps = farmlandSteps + 1 end
+end
+check("bay: turtle NEVER places farmland (smother ban)", farmlandSteps == 0, farmlandSteps)
 local sandboxCrops = 0
 for _, s in ipairs(M.genBay(10, BASE)) do
   if s.crop then sandboxCrops = sandboxCrops + 1 end
@@ -107,6 +112,20 @@ local function newWorld(feederInv)
   world[key(27, 9, -5)] = "solar_gen"
   world[key(0, 0, -1)] = "feeder"
   world[key(0, 0, -4)] = "coal_chest"
+  -- the operator hand-tills the beds (turtle is banned from farmland);
+  -- model that so the seed-planting path still proves out
+  for k = 1, 10 do
+    local px = M.BAY_X(k)
+    for row = 1, 9 do
+      for col = 1, 9 do
+        local isW = false
+        for _, w in ipairs(M.WATERS) do
+          if w[1] == col and w[2] == row then isW = true end
+        end
+        if not isW then world[key(px + row, 14, M.Z0 + col)] = "operator_farmland" end
+      end
+    end
+  end
   return { world = world, invs = { [key(0, 0, -1)] = feederInv,
     [key(0, 0, -4)] = { { name = "minecraft:coal", count = 512 } } },
     placed = {} }
@@ -319,16 +338,14 @@ local function verifyPlant(world)
     if world[key(px + 5, 14, 0)] ~= I.PYLON then return k .. ":pylon" end
     if world[key(px + 5, 15, 0)] ~= "sophisticatedstorage:netherite_chest" then return k .. ":chest" end
     if world[key(px + 5, 14, M.Z0)] ~= "cyclic:user" then return k .. ":user" end
-    local farm, crops, pads = 0, 0, 0
+    local crops, pads = 0, 0
     for row = 1, 9 do
       for col = 1, 9 do
-        if world[key(px + row, 14, M.Z0 + col)] == bay.farmland then farm = farm + 1 end
         local up = world[key(px + row, 15, M.Z0 + col)]
         if up and up:find("^crop:") then crops = crops + 1 end
         if up == I.LILYPAD then pads = pads + 1 end
       end
     end
-    if farm ~= 76 then return k .. ":farmland=" .. farm end
     if pads ~= 4 then return k .. ":pads=" .. pads end
     if crops ~= (bay.seed and 76 or 0) then return k .. ":crops=" .. crops end
   end

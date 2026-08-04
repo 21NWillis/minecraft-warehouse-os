@@ -107,8 +107,11 @@ local function genBay(k, base)
   end
   local isWater = {}
   for _, w in ipairs(WATERS) do isWater[w[1] .. "," .. w[2]] = true end
+  -- slab stands sit at bed level; on repair reruns the operator's
+  -- farmland occupies them - tolerant: unreachable stand implies the
+  -- slab beneath already exists (something is standing on it)
   for dx = 0, 10 do
-    for dz = 0, 10 do S(px + dx, SLAB_Y, Z0 + dz, base) end
+    for dz = 0, 10 do S(px + dx, SLAB_Y, Z0 + dz, base, { tolerant = true }) end
   end
   for dx = 0, 10 do
     for dz = 0, 10 do
@@ -117,13 +120,11 @@ local function genBay(k, base)
     end
   end
   S(px + 5, SLAB_Y + 1, Z0, ITEMS.USER)
-  for row = 1, 9 do
-    for col = 1, 9 do
-      if not isWater[col .. "," .. row] then
-        S(px + row, SLAB_Y + 1, Z0 + col, bay.farmland)
-      end
-    end
-  end
+  -- FARMLAND IS HAND-PLACED BY THE OPERATOR. The turtle is BANNED from
+  -- farmland: placeDown smothers it into dirt instantly (a solid block
+  -- above fresh farmland converts it - the turtle IS that block). It
+  -- cost a fortune in supremium farmland to learn this. The per-bay
+  -- tier plan in BAYS is the operator's essence-painting reference.
   for _, w in ipairs(WATERS) do
     S(px + w[2], SLAB_Y + 1, Z0 + w[1], ITEMS.BUCKET, { water = true })
   end
@@ -173,7 +174,6 @@ local function bayBOM(k, base)
   local bay = BAYS[k]
   local bom = {
     [base] = 121 + 39,
-    [bay.farmland] = 76,
     [ITEMS.PYLON] = 1, [ITEMS.USER] = 1, [ITEMS.CHEST] = 1,
     [ITEMS.LILYPAD] = 4, [ITEMS.BUCKET] = 5,
   }
@@ -385,6 +385,10 @@ local function run(t, opts)
       local s = steps[i]
       local st = s.stand
       if not goTo(st[1], st[2], st[3]) then
+        if s.tolerant then
+          if opts.onProgress then opts.onProgress(phase, i, #steps) end
+          goto continue
+        end
         return false, ("blocked reaching step %d of %s"):format(i, phase)
       end
       if s.fwd then
@@ -404,6 +408,7 @@ local function run(t, opts)
         end
       end
       if opts.onProgress then opts.onProgress(phase, i, #steps) end
+      ::continue::
     end
     return true
   end
