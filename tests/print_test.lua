@@ -270,11 +270,12 @@ local function newTurtle(sh, opts)
         return out
       end,
       pushItems = function(target, slot, limit)
+        -- real pushItems moves at most ONE STACK per call
         local tk = sideKey(target)
         local tinv = tk and sh.invs[tk]
         local s = inv[slot]
         if not tinv or not s or s.count <= 0 then return 0 end
-        local n = math.min(limit or s.count, s.count)
+        local n = math.min(limit or s.count, s.count, maxStack(s.name))
         invPut(tinv, s.name, n)
         s.count = s.count - n
         return n

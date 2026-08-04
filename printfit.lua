@@ -289,9 +289,10 @@ local function run(t, opts)
       local d = t.getItemDetail(slot)
       if d and wantOf(d.name) == 0 then t.select(slot); dropFeeder() end
     end
-    -- flush: bin residue back into the feeder (API, instant)
+    -- flush: bin residue back into the feeder. pushItems moves at most
+    -- ONE STACK per call - mega slots need repeated pushes.
     for slot in pairs(bin.list()) do
-      bin.pushItems("front", slot)
+      while bin.pushItems("front", slot) > 0 do end
     end
     -- stage: exactly the missing quantities, feeder -> bin (API)
     for name, want in pairs(bom) do
@@ -300,7 +301,11 @@ local function run(t, opts)
         for slot, item in pairs(feeder.list()) do
           if need <= 0 then break end
           if item.name == name then
-            need = need - feeder.pushItems("back", slot, need)
+            while need > 0 do
+              local moved = feeder.pushItems("back", slot, need)
+              if moved == 0 then break end
+              need = need - moved
+            end
           end
         end
         if need > 0 then
