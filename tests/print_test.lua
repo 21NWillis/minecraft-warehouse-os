@@ -1,4 +1,4 @@
--- headless printfit v3 test: datum-frame plant east of the warehouse,
+﻿-- headless printfit v3 test: datum-frame plant east of the warehouse,
 -- feeder behind the datum, solar-safety, access tower, 2-shard
 -- partition, resume - and REALISTIC inventory semantics: the mock
 -- feeder MERGES returned stacks into existing slots and suck() always
@@ -70,6 +70,8 @@ local function maxStack(name)
   return 64
 end
 
+-- slot indices are STABLE (real inventories leave gaps); zero-count
+-- husks persist and may be refilled by same-name merges
 local function invPut(inv, name, count)
   if maxStack(name) > 1 then
     for _, s in ipairs(inv) do
@@ -84,11 +86,10 @@ local function invPut(inv, name, count)
 end
 
 local function invTake(inv)
-  for i, s in ipairs(inv) do
+  for _, s in ipairs(inv) do
     if s.count > 0 then
       local n = math.min(maxStack(s.name), s.count)
       s.count = s.count - n
-      if s.count == 0 then table.remove(inv, i) end
       return { name = s.name, count = n }
     end
   end
@@ -245,6 +246,41 @@ local function newTurtle(sh, opts)
       return true
     end,
   }
+  -- peripheral shim: wrap("front"/"back"/...) resolves relative to the
+  -- turtle's CURRENT facing; pushItems targets resolve the same way
+  m.wrap = function(side)
+    local function sideKey(s)
+      if s == "front" then return facedKey() end
+      if s == "back" then
+        return key(m.x - DIRS[m.f][1], m.y, m.z - DIRS[m.f][2])
+      end
+      if s == "top" then return key(m.x, m.y + 1, m.z) end
+      if s == "bottom" then return belowKey() end
+      return nil
+    end
+    local myKey = sideKey(side)
+    local inv = myKey and sh.invs[myKey]
+    if not inv then return nil end
+    return {
+      list = function()
+        local out = {}
+        for i, s in ipairs(inv) do
+          if s.count > 0 then out[i] = { name = s.name, count = s.count } end
+        end
+        return out
+      end,
+      pushItems = function(target, slot, limit)
+        local tk = sideKey(target)
+        local tinv = tk and sh.invs[tk]
+        local s = inv[slot]
+        if not tinv or not s or s.count <= 0 then return 0 end
+        local n = math.min(limit or s.count, s.count)
+        invPut(tinv, s.name, n)
+        s.count = s.count - n
+        return n
+      end,
+    }
+  end
   return m
 end
 
@@ -301,7 +337,7 @@ end
 -- ------------------------------------------------- full plant, 1 turtle
 local sh = newWorld(manifest())
 local t1 = newTurtle(sh, { hand = HAND() })
-local ok, err = M.run(t1.ops, { base = BASE, shard = 1, of = 1 })
+local ok, err = M.run(t1.ops, { base = BASE, shard = 1, of = 1, wrap = t1.wrap })
 check("sim: plant completes vs merging feeder", ok == true, tostring(err))
 check("sim: parks at its dock", t1.x == 0 and t1.y == 0 and t1.z == -2,
   ("at %d,%d,%d"):format(t1.x, t1.y, t1.z))
@@ -336,10 +372,10 @@ check("access: catwalk links all gaps", links == 9, links)
 -- --------------------------------------------------- 2-shard partition
 local sh2 = newWorld(manifest())
 local tA = newTurtle(sh2, { hand = HAND() })
-local okA, errA = M.run(tA.ops, { base = BASE, shard = 1, of = 2 })
+local okA, errA = M.run(tA.ops, { base = BASE, shard = 1, of = 2, wrap = tA.wrap })
 check("shards: A (odd bays + access) completes", okA == true, tostring(errA))
 local tB = newTurtle(sh2, { hand = HAND() })
-local okB, errB = M.run(tB.ops, { base = BASE, shard = 2, of = 2 })
+local okB, errB = M.run(tB.ops, { base = BASE, shard = 2, of = 2, wrap = tB.wrap })
 check("shards: B (even bays) completes", okB == true, tostring(errB))
 check("shards: union builds the whole plant", verifyPlant(sh2.world) == nil,
   verifyPlant(sh2.world))
@@ -353,7 +389,7 @@ for _, s in ipairs(manifest()) do
 end
 local sh3 = newWorld(shortInv)
 local t3 = newTurtle(sh3, { hand = HAND() })
-local ok3, err3 = M.run(t3.ops, { base = BASE, shard = 1, of = 1 })
+local ok3, err3 = M.run(t3.ops, { base = BASE, shard = 1, of = 1, wrap = t3.wrap })
 check("sim: missing item reported", ok3 == false and err3:find("missing") ~= nil, tostring(err3))
 check("sim: missing item names the culprit", tostring(err3):find("harvester_pylon") ~= nil, err3)
 
@@ -362,14 +398,14 @@ local sh4 = newWorld(manifest())
 local t4 = newTurtle(sh4, { hand = HAND() })
 local crashed = false
 local okP = pcall(function()
-  M.run(t4.ops, { base = BASE, shard = 1, of = 1,
+  M.run(t4.ops, { base = BASE, shard = 1, of = 1, wrap = t4.wrap,
     onProgress = function(phase, i)
       if phase:find("bay 2") and i == 50 then crashed = true; error("simulated crash") end
     end })
 end)
 check("sim: crash mid-bay-2 simulated", okP == false and crashed)
 t4.x, t4.y, t4.z, t4.f = 0, 0, 0, 0
-local ok4, err4 = M.run(t4.ops, { base = BASE, shard = 1, of = 1,
+local ok4, err4 = M.run(t4.ops, { base = BASE, shard = 1, of = 1, wrap = t4.wrap,
   resume = { bay = 2, step = 51 } })
 check("sim: resume completes", ok4 == true, tostring(err4))
 check("sim: resumed plant fully correct", verifyPlant(sh4.world) == nil,

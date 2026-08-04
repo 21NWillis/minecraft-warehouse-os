@@ -256,13 +256,14 @@ local function run(t, opts)
   local function suckBin() face(dock.binFace) return t.suck() end
   local function dropBin() face(dock.binFace) return t.drop() end
 
-  -- THE REJECT BIN: real inventories MERGE returned stacks back into
-  -- their front slots, so a naive suck-and-drop-back protocol livelocks
-  -- (the turtle yo-yos the same front stack forever and never reaches
-  -- deeper slots). Rejects therefore park in a plain chest directly
-  -- ABOVE the docked turtle; each item moves through the turtle at most
-  -- once per direction: feeder->turtle->bin, or bin->turtle->feeder.
-  -- The bin persists between kits as a cache of recent rejects.
+  -- THE KIT, v4 (streamlined): physical suck/drop shuffling against a
+  -- mega feeder took 15+ minutes per kit (field-measured). Instead the
+  -- turtle wraps the feeder and bin as inventory PERIPHERALS and
+  -- commands transfers directly - pushItems moves whole stacks per
+  -- tick. Protocol: flush bin->feeder (API), stage exactly the bay's
+  -- shopping list feeder->bin (API), then suck the bin dry (~16 pulls).
+  -- REQUIREMENT: the feeder must expose an inventory API - a CHEST
+  -- always does; a placed backpack may not. Use the omega chest.
   local function kit(bom)
     if not atDock() then return false, "blocked returning to the feeder dock" end
     face(dock.binFace)
@@ -272,108 +273,50 @@ local function run(t, opts)
       end
       if not t.place() then return false, "cannot place my reject bin" end
     end
+    face(dock.face)
+    local wrap = opts.wrap
+    local feeder = wrap and wrap("front")
+    local bin = wrap and wrap("back")
+    if not (feeder and feeder.list and feeder.pushItems) then
+      return false, "feeder exposes no inventory API - use a CHEST as feeder"
+    end
+    if not (bin and bin.list and bin.pushItems) then
+      return false, "bin exposes no inventory API"
+    end
     local function wantOf(name) return bom[name] or 0 end
-    local function deficit()
-      local total = 0
-      for name, want in pairs(bom) do
-        if have(name) < want then total = total + (want - have(name)) end
-      end
-      return total
-    end
-    local function firstMissing()
-      for name, want in pairs(bom) do
-        if have(name) < want then return name end
-      end
-    end
-    -- dump: anything not on this bay's list goes into the bin
+    -- dump: leftovers this bay doesn't need go straight to the feeder
     for slot = 1, 16 do
       local d = t.getItemDetail(slot)
-      if d and wantOf(d.name) == 0 then t.select(slot); dropBin() end
+      if d and wantOf(d.name) == 0 then t.select(slot); dropFeeder() end
     end
-    -- item phase: drain the bin cache first (rejects -> feeder), then
-    -- the feeder (rejects -> bin). ALL outflow follows the phase
-    -- direction - venting into the inventory being drained livelocks.
-    local guard = 0
-    local binDrained = false
-    local function vent()
-      if binDrained then dropBin() else dropFeeder() end
+    -- flush: bin residue back into the feeder (API, instant)
+    for slot in pairs(bin.list()) do
+      bin.pushItems("front", slot)
     end
-    while deficit() > 0 do
-      local before = deficit()
-      local free = false
-      for slot = 1, 16 do
-        if not t.getItemDetail(slot) then free = true break end
-      end
-      if not free then
-        local dropped = false
-        for slot = 1, 16 do
-          local d = t.getItemDetail(slot)
-          if d and have(d.name) - d.count >= wantOf(d.name) then
-            t.select(slot); vent(); dropped = true
-            break
+    -- stage: exactly the missing quantities, feeder -> bin (API)
+    for name, want in pairs(bom) do
+      local need = want - have(name)
+      if need > 0 then
+        for slot, item in pairs(feeder.list()) do
+          if need <= 0 then break end
+          if item.name == name then
+            need = need - feeder.pushItems("back", slot, need)
           end
         end
-        if not dropped then
-          for slot = 1, 16 do
-            local d = t.getItemDetail(slot)
-            if d and have(d.name) >= wantOf(d.name) then
-              t.select(slot); vent()
-              break
-            end
-          end
-        end
-      end
-      local got = false
-      if not binDrained then
-        got = suckBin()
-        if not got then binDrained = true end
-      end
-      if not got then got = suckFeeder() end
-      if not got then
-        return false, "feeder is missing " .. (firstMissing() or "?")
-      end
-      for slot = 1, 16 do
-        local d = t.getItemDetail(slot)
-        if d and wantOf(d.name) == 0 then
-          t.select(slot); vent()
-        end
-      end
-      if deficit() < before then guard = 0 else guard = guard + 1 end
-      if guard > KIT_LIMIT then
-        return false, "feeder is missing " .. (firstMissing() or "?")
-      end
-    end
-    -- flush the bin back into the feeder: shared items (machine stacks,
-    -- farmland other bays need) must never strand in a private bin.
-    -- Every line is met, so anything wanted is by definition surplus.
-    local function freeSlot()
-      for slot = 1, 16 do
-        if not t.getItemDetail(slot) then return true end
-      end
-      return false
-    end
-    if not freeSlot() then
-      for slot = 1, 16 do
-        local d = t.getItemDetail(slot)
-        if d and have(d.name) - d.count >= wantOf(d.name) then
-          t.select(slot); dropFeeder()
-          break
+        if need > 0 then
+          return false, "feeder is missing " .. name
         end
       end
     end
-    while freeSlot() do
-      if not suckBin() then break end
-      local moved = false
-      for slot = 1, 16 do
-        local d = t.getItemDetail(slot)
-        if d and (wantOf(d.name) == 0 or have(d.name) - d.count >= wantOf(d.name)) then
-          t.select(slot); dropFeeder(); moved = true
-          break
-        end
-      end
-      if not moved then break end
-    end
+    -- collect: the bin now holds exactly this bay's kit
+    face(dock.binFace)
+    while t.suck() do end
     face(dock.face)
+    for name, want in pairs(bom) do
+      if have(name) < want then
+        return false, "feeder is missing " .. name .. " (post-stage)"
+      end
+    end
     return true
   end
 
@@ -561,6 +504,7 @@ end
 local ok, err = run(turtle, {
   base = base, shard = shard, of = of, resume = resume,
   retries = 10, sleep = function(s) os.sleep(s) end,
+  wrap = function(side) return peripheral.wrap(side) end,
   report = function(k, key) print(("bay %d: %s"):format(k, key)) end,
   onProgress = function(phase, i, n)
     local h = fs.open(STATE, "w")
