@@ -69,3 +69,4 @@ surveyd.lua
 bursarfit.lua
 farmfit.lua
 printfit.lua
+enchantfit.lua
