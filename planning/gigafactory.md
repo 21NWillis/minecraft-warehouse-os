@@ -76,6 +76,19 @@ printer makes materials cheap, so tier-rushing is correct.
      the wind row, ethylene wall, and fission hall. Ultimate universal
      cables only - the printer pays for them.
 
+  G. DYSON CUBE (passive baseline - dysoncubeproject is in the pack):
+     EM Rail Ejector multiblock launches Solar Sails + Beams to build
+     a sphere (0-100%); Ray Receiver multiblock brings FE down.
+     Sail = 4 glass panes + 3 copper + 2 lapis (341k lapis idle!);
+     Beam x2 = ~28 iron. THE printer sink: iron bay + lapis hoard ->
+     autocraft sails/beams -> eject (power ramps ejection rate) ->
+     permanent passive grid, no fuel, no meltdown. Doctrine: Dyson =
+     baseline load, fission = burst/density + the waste->polonium
+     line Mekanism endgame needs anyway. Spheres are per-player with
+     subscriptions - at 100% "daylight is a subscription service,"
+     which is the most on-brand sentence any mod has ever printed.
+     Verify in field: receiver FE/t scaling per beams/sphere %.
+
 ## 4.5 The CC advantage (nobody else on the server has this)
 
 The corp is hooked into ComputerCraft end-to-end, which makes the
