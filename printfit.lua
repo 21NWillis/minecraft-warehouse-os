@@ -464,19 +464,54 @@ local args = { ... }
 if args[1] == "scan" then
   turtle.turnRight() turtle.turnRight()
   local p = peripheral.wrap("front")
+  local lines = {}
   if not (p and p.list) then
-    print("no inventory API in front of me - is the feeder behind the datum?")
+    lines[#lines + 1] = "NO INVENTORY API in front - is the feeder behind the datum?"
   else
-    print("FEEDER CONTENTS (slot: count x id):")
+    lines[#lines + 1] = "FEEDER CONTENTS (slot: count x id):"
     for slot, item in pairs(p.list()) do
-      print(("  %d: %d x %s"):format(slot, item.count, item.name))
+      lines[#lines + 1] = ("  %d: %d x %s"):format(slot, item.count, item.name)
     end
-    print("BAY 1 WANTS:")
+    lines[#lines + 1] = "BAY 1 WANTS:"
     for name, want in pairs(bayBOM(1, args[2] or "minecraft:cobbled_deepslate")) do
-      print(("  %d x %s"):format(want, name))
+      lines[#lines + 1] = ("  %d x %s"):format(want, name)
     end
   end
   turtle.turnRight() turtle.turnRight()
+  local report = table.concat(lines, "\n")
+  print(report)
+  -- upload like survey does: the operator can't copy CC output, only
+  -- retype a short pastebin code
+  local function devKey()
+    local rom = fs.open("rom/programs/http/pastebin.lua", "r")
+    if rom then
+      local src = rom.readAll()
+      rom.close()
+      local k = src:match('key%s*=%s*"(%x+)"')
+      if k then return k end
+    end
+    return "0ec2eb25b6166c0c27a394ae118ad829"
+  end
+  if http then
+    local resp = http.post("https://pastebin.com/api/api_post.php",
+      "api_option=paste&api_dev_key=" .. devKey()
+      .. "&api_paste_name=" .. textutils.urlEncode("printfit scan")
+      .. "&api_paste_code=" .. textutils.urlEncode(report))
+    if resp then
+      local url = resp.readAll()
+      resp.close()
+      local code = url:match("pastebin%.com/(%w+)")
+      if code then
+        print("=====================================")
+        print("  SCAN uploaded - pastebin " .. code)
+        print("=====================================")
+      else
+        print("upload failed: " .. tostring(url))
+      end
+    else
+      print("upload failed - no response")
+    end
+  end
   return
 end
 
