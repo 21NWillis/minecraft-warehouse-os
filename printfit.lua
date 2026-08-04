@@ -2,9 +2,13 @@
 -- Design: planning/item_printer.md
 --
 -- THE CORP LAUNCH CONVENTION: turtle ON THE GOLD DATUM facing campus
--- north, a stack of coal loaded by hand, FEEDER (stocked backpack or
--- omega chest) placed DIRECTLY BEHIND THE DATUM on the pad deck.
--- That's the whole ritual, for every shard.
+-- north, hand-loaded with A STACK OF COAL and ONE PLAIN CHEST (its
+-- reject bin). Station furniture on the pad deck:
+--   * FEEDER (stocked backpack/omega chest) DIRECTLY BEHIND the datum
+--   * COAL CHEST (plain chest, ALL the coal, NOTHING else) 4 blocks
+--     behind the datum (3 behind the feeder)
+-- Each shard sets its bin chest beside its own dock; bins stay as
+-- station furniture (kit caches) - don't remove them mid-run.
 --
 -- SITE: the plant floats at y14, ENTIRELY EAST of the warehouse - no
 -- column overhangs the roof, because Mekanism solars need an
@@ -56,22 +60,26 @@ local ITEMS = {
   EMPTY_BUCKET = "minecraft:bucket",
   COAL = "minecraft:coal",
   LADDER = "minecraft:ladder",
+  BIN = "minecraft:chest",   -- reject bin, hand-loaded, placed at the dock
 }
 
 -- datum-frame geometry
 local FEEDER = { 0, 0, -1 }        -- directly behind the datum
+local COAL_CHEST = { 0, 0, -4 }    -- shared fuel depot: plain chest,
+                                   -- COAL ONLY, 4 south of the datum
 local X0, Z0, SLAB_Y = 30, -5, 13  -- bay k slab: x X0+(k-1)*12, z Z0..Z0+10
 local TOWER = { x = 28, z = 4 }    -- ladder tower, roof NE corner
 local ROOF_TOP = 8
 
--- feeder docks, one per shard: distinct cells around the backpack.
--- Shard 1 = top (suckDown). The datum cell itself stays free so more
--- shards can always launch.
+-- feeder docks, one per shard: side cells around the backpack, each
+-- with its reject-bin chest BESIDE it (never above - a bin over the
+-- dock would seal the turtle's own ascent column). Shard 4 docks on
+-- the datum cell itself, so launch shards in order 1..4.
 local DOCKS = {
-  { at = { 0, 1, -1 }, vertical = true },
-  { at = { 0, 0, -2 }, face = 0 },
-  { at = { 1, 0, -1 }, face = 3 },
-  { at = { -1, 0, -1 }, face = 1 },
+  { at = { 0, 0, -2 }, face = 0, binFace = 2, bin = { 0, 0, -3 } },
+  { at = { 1, 0, -1 }, face = 3, binFace = 1, bin = { 2, 0, -1 } },
+  { at = { -1, 0, -1 }, face = 1, binFace = 3, bin = { -2, 0, -1 } },
+  { at = { 0, 0, 0 }, face = 2, binFace = 0, bin = { 0, 0, 1 } },
 }
 
 local BAY_X = function(k) return X0 + (k - 1) * 12 end
@@ -235,18 +243,33 @@ local function run(t, opts)
     return total
   end
 
-  local suckFn = dock.vertical and t.suckDown or t.suck
-  local dropFn = dock.vertical and t.dropDown or t.drop
   local function atDock()
     if not goTo(dock.at[1], dock.at[2], dock.at[3]) then return false end
-    if dock.face then face(dock.face) end
+    face(dock.face)
     return true
   end
+  local function suckFeeder() face(dock.face) return t.suck() end
+  local function dropFeeder() face(dock.face) return t.drop() end
+  local function suckBin() face(dock.binFace) return t.suck() end
+  local function dropBin() face(dock.binFace) return t.drop() end
 
+  -- THE REJECT BIN: real inventories MERGE returned stacks back into
+  -- their front slots, so a naive suck-and-drop-back protocol livelocks
+  -- (the turtle yo-yos the same front stack forever and never reaches
+  -- deeper slots). Rejects therefore park in a plain chest directly
+  -- ABOVE the docked turtle; each item moves through the turtle at most
+  -- once per direction: feeder->turtle->bin, or bin->turtle->feeder.
+  -- The bin persists between kits as a cache of recent rejects.
   local function kit(bom)
     if not atDock() then return false, "blocked returning to the feeder dock" end
+    face(dock.binFace)
+    if not t.detect() then
+      if not ensure(ITEMS.BIN) then
+        return false, "hand me a plain chest (my reject bin) and rerun"
+      end
+      if not t.place() then return false, "cannot place my reject bin" end
+    end
     local function wantOf(name) return bom[name] or 0 end
-    local function keepable(name) return wantOf(name) > 0 end
     local function deficit()
       local total = 0
       for name, want in pairs(bom) do
@@ -259,26 +282,19 @@ local function run(t, opts)
         if have(name) < want then return name end
       end
     end
+    -- dump: anything not on this bay's list goes into the bin
     for slot = 1, 16 do
       local d = t.getItemDetail(slot)
-      if d and not keepable(d.name) then t.select(slot); dropFn() end
+      if d and wantOf(d.name) == 0 then t.select(slot); dropBin() end
     end
-    local rejects = 0
-    while t.getFuelLevel() ~= "unlimited" and t.getFuelLevel() < FUEL_MIN do
-      if ensure(ITEMS.COAL) then
-        t.refuel(64)
-      elseif suckFn() then
-        for slot = 1, 16 do
-          local d = t.getItemDetail(slot)
-          if d and d.name ~= ITEMS.COAL then t.select(slot); dropFn() end
-        end
-        rejects = rejects + 1
-        if rejects > KIT_LIMIT then return false, "feeder has no coal" end
-      else
-        return false, "feeder has no coal"
-      end
+    -- item phase: drain the bin cache first (rejects -> feeder), then
+    -- the feeder (rejects -> bin). ALL outflow follows the phase
+    -- direction - venting into the inventory being drained livelocks.
+    local guard = 0
+    local binDrained = false
+    local function vent()
+      if binDrained then dropBin() else dropFeeder() end
     end
-    rejects = 0
     while deficit() > 0 do
       local before = deficit()
       local free = false
@@ -290,7 +306,7 @@ local function run(t, opts)
         for slot = 1, 16 do
           local d = t.getItemDetail(slot)
           if d and have(d.name) - d.count >= wantOf(d.name) then
-            t.select(slot); dropFn(); dropped = true
+            t.select(slot); vent(); dropped = true
             break
           end
         end
@@ -298,26 +314,112 @@ local function run(t, opts)
           for slot = 1, 16 do
             local d = t.getItemDetail(slot)
             if d and have(d.name) >= wantOf(d.name) then
-              t.select(slot); dropFn()
+              t.select(slot); vent()
               break
             end
           end
         end
       end
-      if not suckFn() then
+      local got = false
+      if not binDrained then
+        got = suckBin()
+        if not got then binDrained = true end
+      end
+      if not got then got = suckFeeder() end
+      if not got then
         return false, "feeder is missing " .. (firstMissing() or "?")
       end
       for slot = 1, 16 do
         local d = t.getItemDetail(slot)
-        if d and (d.name == ITEMS.COAL or not keepable(d.name)) then
-          t.select(slot); dropFn()
+        if d and wantOf(d.name) == 0 then
+          t.select(slot); vent()
         end
       end
-      if deficit() < before then rejects = 0 else rejects = rejects + 1 end
-      if rejects > KIT_LIMIT then
+      if deficit() < before then guard = 0 else guard = guard + 1 end
+      if guard > KIT_LIMIT then
         return false, "feeder is missing " .. (firstMissing() or "?")
       end
     end
+    -- flush the bin back into the feeder: shared items (machine stacks,
+    -- farmland other bays need) must never strand in a private bin.
+    -- Every line is met, so anything wanted is by definition surplus.
+    local function freeSlot()
+      for slot = 1, 16 do
+        if not t.getItemDetail(slot) then return true end
+      end
+      return false
+    end
+    if not freeSlot() then
+      for slot = 1, 16 do
+        local d = t.getItemDetail(slot)
+        if d and have(d.name) - d.count >= wantOf(d.name) then
+          t.select(slot); dropFeeder()
+          break
+        end
+      end
+    end
+    while freeSlot() do
+      if not suckBin() then break end
+      local moved = false
+      for slot = 1, 16 do
+        local d = t.getItemDetail(slot)
+        if d and (wantOf(d.name) == 0 or have(d.name) - d.count >= wantOf(d.name)) then
+          t.select(slot); dropFeeder(); moved = true
+          break
+        end
+      end
+      if not moved then break end
+    end
+    face(dock.face)
+    return true
+  end
+
+  -- parallel shards borrow shared stacks from the feeder during their
+  -- kits; a "missing" may just mean another shard is mid-kit. Retry.
+  local function kitRetry(bom, label)
+    local okKit, kerr
+    for _ = 1, opts.retries or 1 do
+      okKit, kerr = kit(bom)
+      if okKit or not tostring(kerr):find("missing") then break end
+      if opts.sleep then opts.sleep(20) end
+    end
+    if not okKit then return false, label .. ": " .. tostring(kerr) end
+    return true
+  end
+
+  -- fuel: a dedicated COAL-ONLY chest south of the station, shared by
+  -- all shards. No filtering, no cycling, no coal ever migrating into
+  -- a private bin. Leftover chunks are burned, never carried.
+  local function refuelAtDepot()
+    if t.getFuelLevel() == "unlimited" or t.getFuelLevel() >= FUEL_MIN then
+      return true
+    end
+    if not goTo(COAL_CHEST[1], COAL_CHEST[2] + 1, COAL_CHEST[3]) then
+      return false, "blocked reaching the coal chest"
+    end
+    local guard = 0
+    while t.getFuelLevel() < FUEL_MIN do
+      if ensure(ITEMS.COAL) then
+        t.refuel(64)
+      elseif t.suckDown() then
+        guard = guard + 1
+        if guard > 64 then return false, "coal chest holds non-coal junk" end
+      else
+        return false, "coal chest is empty - refill it"
+      end
+    end
+    -- burn the change (stop at the fuel cap), return any cap leftovers
+    while ensure(ITEMS.COAL) do
+      local f0 = t.getFuelLevel()
+      t.refuel(64)
+      if t.getFuelLevel() == f0 then break end
+    end
+    for slot = 1, 16 do
+      local d = t.getItemDetail(slot)
+      if d and d.name == ITEMS.COAL then t.select(slot); t.dropDown() end
+    end
+    -- (non-coal junk from a polluted depot rides along; the next kit
+    -- vents it into the bin)
     return true
   end
 
@@ -356,8 +458,10 @@ local function run(t, opts)
     local from = (k == startBay) and startStep or 1
     local steps = genBay(k, base)
     if from <= 1 then
-      local okKit, kerr = kit(bayBOM(k, base))
-      if not okKit then return false, "bay " .. k .. " (" .. BAYS[k].key .. "): " .. kerr end
+      local okF, ferr = refuelAtDepot()
+      if not okF then return false, "bay " .. k .. ": " .. tostring(ferr) end
+      local okKit, kerr = kitRetry(bayBOM(k, base), "bay " .. k .. " (" .. BAYS[k].key .. ")")
+      if not okKit then return false, kerr end
     end
     if opts.report then opts.report(k, BAYS[k].key) end
     local okB, berr = execute(steps, "bay " .. k .. ":" .. BAYS[k].key, from)
@@ -370,8 +474,10 @@ local function run(t, opts)
   -- overlap any pod, so other shards can still be mid-build; on resume
   -- this re-runs harmlessly - existing blocks skip, change returns)
   if shard == 1 then
-    local okKit, kerr = kit(accessBOM(base))
-    if not okKit then return false, "access: " .. kerr end
+    local okF, ferr = refuelAtDepot()
+    if not okF then return false, "access: " .. tostring(ferr) end
+    local okKit, kerr = kitRetry(accessBOM(base), "access")
+    if not okKit then return false, kerr end
     local okA, aerr = execute(genAccess(base), "access", 1)
     if not okA then return false, aerr end
   end
@@ -379,8 +485,9 @@ local function run(t, opts)
   -- return the change and park empty at the dock
   if atDock() then
     for slot = 1, 16 do
-      if t.getItemDetail(slot) then t.select(slot); dropFn() end
+      if t.getItemDetail(slot) then t.select(slot); dropFeeder() end
     end
+    face(dock.face)
   end
   return true
 end
@@ -412,7 +519,6 @@ if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 300 then
   print("hand me a stack of coal first (fuel " .. turtle.getFuelLevel() .. ")")
   return
 end
-
 print(("printfit shard %d/%d - base %s"):format(shard, of, base))
 -- (feeder presence is verified by the first kit: a missing/misplaced
 -- feeder stops with "feeder is missing ..." before anything is built)
@@ -426,8 +532,21 @@ if fs.exists(STATE) then
   print(("resuming at bay %d step %d"):format(resume.bay, resume.step))
 end
 
+if not resume then
+  local hasBin = false
+  for slot = 1, 16 do
+    local d = turtle.getItemDetail(slot)
+    if d and d.name == ITEMS.BIN then hasBin = true end
+  end
+  if not hasBin then
+    print("also hand me ONE plain chest (my reject bin) - required")
+    return
+  end
+end
+
 local ok, err = run(turtle, {
   base = base, shard = shard, of = of, resume = resume,
+  retries = 10, sleep = function(s) os.sleep(s) end,
   report = function(k, key) print(("bay %d: %s"):format(k, key)) end,
   onProgress = function(phase, i, n)
     local h = fs.open(STATE, "w")
