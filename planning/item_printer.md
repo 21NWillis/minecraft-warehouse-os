@@ -63,14 +63,13 @@ These priors are soft. The calibration protocol is the real model:
    layers under the SLOW bays only — consistency is tuned downward
    into the void, not by nerfing fast bays
 
-## The hoe problem (industrial miracles)
+## The hoe problem (solved by supremium)
 
-At thousands of harvests/hr, durability hoes die in minutes.
-`canBeAutomated=false` means no hoe restocking by pipe. Therefore each
-pylon wants an **Unbreakable hoe** — the Apotheosis mythic reforge 1%
-unbreakable roll, on netherite hoes, x9. The reforge-spam economy now
-produces capital equipment. (Fallback: Unbreaking-X printed hoes and a
-weekly hand-swap, but the 1% roll is cheaper than the labor.)
+At thousands of harvests/hr, durability hoes die in minutes, and
+`canBeAutomated=false` means no hoe restocking by pipe. Answer:
+**Supremium Hoes** — MA supremium tools take no durability, which
+satisfies the pylon's unbreakable-tool automation rule. One per bay,
+crafted off Errot's supremium autocrafting line.
 
 ## Storage spine (user's architecture, ratified)
 
