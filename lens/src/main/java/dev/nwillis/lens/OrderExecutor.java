@@ -153,7 +153,8 @@ public final class OrderExecutor {
             && mc.level.getGameTime() >= (long) pendingVerify.peek()[1]) {
             Object[] v = pendingVerify.poll();
             BuildOrder.Placement p = (BuildOrder.Placement) v[0];
-            boolean ok = !mc.level.getBlockState(p.pos()).isAir();
+            var vs = mc.level.getBlockState(p.pos());
+            boolean ok = !vs.isAir() && !vs.canBeReplaced();
             Telemetry.logPlace(p.pos(), (BlockPos) v[2], (Direction) v[3],
                 (Double) v[4], (String) v[5], ok, 1);
             if (!ok) {
@@ -195,8 +196,11 @@ public final class OrderExecutor {
             attempts = 0;
             resetPlacement();
         }
-        // already satisfied? (previous pass, another builder, us)
-        if (!mc.level.getBlockState(target).isAir()) {
+        // already satisfied? (previous pass, another builder, us).
+        // Replaceable states (water, grass) count as EMPTY - the printer
+        // bays are flooded, and farmland places into water legally.
+        var cur = mc.level.getBlockState(target);
+        if (!cur.isAir() && !cur.canBeReplaced()) {
             queue.poll();
             done++;
             return;
