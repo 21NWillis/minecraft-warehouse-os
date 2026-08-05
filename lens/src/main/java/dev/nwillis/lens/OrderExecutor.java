@@ -65,11 +65,11 @@ public final class OrderExecutor {
     private static int aimTicks, verifyTicks, attempts;
     private static String lastResult = "";
     private static final java.util.Map<String, Integer> results = new java.util.TreeMap<>();
-    // click details captured for the placement log
-    private static BlockPos logSupport;
-    private static Direction logFace;
-    private static double logEyeDist;
     private static BlockPos lastTarget;
+    // optimistic pipeline: clicks are assumed good and verified 6 ticks
+    // later; a revert rolls done back and re-queues the block. Entries:
+    // {Placement, deadlineGameTime, support, face, eyeDist, result}
+    private static final Deque<Object[]> pendingVerify = new ArrayDeque<>();
 
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         armKey = new KeyMapping("key.paperclip_lens.control", GLFW.GLFW_KEY_F8,
@@ -82,6 +82,7 @@ public final class OrderExecutor {
         order = o;
         queue = new ArrayDeque<>(o.placements);
         deferred = new ArrayDeque<>();
+        pendingVerify.clear();
         done = 0;
         total = o.placements.size();
         passes = 0;
@@ -105,6 +106,7 @@ public final class OrderExecutor {
         if (state != State.DISARMED) {
             state = State.DISARMED;
             lastDisarm = why;
+            pendingVerify.clear();
             say("control released (" + why + ") - " + done + "/" + total + " placed");
         }
     }
@@ -146,9 +148,25 @@ public final class OrderExecutor {
             return;
         }
 
+        // resolve matured verifications (optimistic pipeline drain)
+        while (!pendingVerify.isEmpty()
+            && mc.level.getGameTime() >= (long) pendingVerify.peek()[1]) {
+            Object[] v = pendingVerify.poll();
+            BuildOrder.Placement p = (BuildOrder.Placement) v[0];
+            boolean ok = !mc.level.getBlockState(p.pos()).isAir();
+            Telemetry.logPlace(p.pos(), (BlockPos) v[2], (Direction) v[3],
+                (Double) v[4], (String) v[5], ok, 1);
+            if (!ok) {
+                done--;
+                results.merge("REVERTED", 1, Integer::sum);
+                queue.addFirst(p);
+            }
+        }
+
         // next placement (retry deferred after each full pass)
         BuildOrder.Placement next = queue.peek();
         if (next == null) {
+            if (!pendingVerify.isEmpty()) return;   // let the pipeline drain
             if (deferred.isEmpty()) {
                 say("order '" + order.name + "' COMPLETE: " + done + "/" + total
                     + "  click results: " + results);
@@ -218,7 +236,7 @@ public final class OrderExecutor {
         }
         // brake and settle before interacting
         player.setDeltaMovement(player.getDeltaMovement().scale(0.4));
-        if (settleTicks++ < 4) return;
+        if (settleTicks++ < 2) return;
         state = State.PLACING;
 
         // vanilla refuses to place a block inside an entity - including us.
@@ -283,37 +301,20 @@ public final class OrderExecutor {
             Math.sqrt(look.x * look.x + look.z * look.z)) * 180.0 / Math.PI));
         if (held == 2 || aimTicks++ < 1) return;
 
-        if (verifyTicks == 0) {
-            var result = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
-            lastResult = String.valueOf(result);
-            results.merge(lastResult, 1, Integer::sum);
-            logSupport = hit.getBlockPos();
-            logFace = hit.getDirection();
-            logEyeDist = player.getEyePosition().distanceTo(hit.getLocation());
-            player.swing(InteractionHand.MAIN_HAND);
-        }
-        // client prediction shows the block instantly; only the server's
-        // answer counts, so wait out the round-trip before judging
-        if (++verifyTicks < 5) return;
-        boolean placed = !mc.level.getBlockState(target).isAir();
-        Telemetry.logPlace(target, logSupport, logFace, logEyeDist,
-            lastResult, placed, attempts + 1);
+        // click and advance immediately: flights 5+ run 100% acceptance,
+        // so the 5-tick server round-trip is pure pipeline stall. The
+        // drain loop above rolls back and re-queues the rare revert.
+        var result = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
+        lastResult = String.valueOf(result);
+        results.merge(lastResult, 1, Integer::sum);
+        player.swing(InteractionHand.MAIN_HAND);
+        pendingVerify.add(new Object[] { next, mc.level.getGameTime() + 6,
+            hit.getBlockPos(), hit.getDirection(),
+            player.getEyePosition().distanceTo(hit.getLocation()), lastResult });
+        queue.poll();
+        done++;   // optimistic; the drain loop takes it back on revert
+        attempts = 0;
         resetPlacement();
-        if (placed) {
-            queue.poll();
-            done++;
-            attempts = 0;
-        } else if (++attempts >= 6) {
-            // a block is a barrier: everything above it needs it placed, so
-            // giving up early turns one miss into a cascade. Six attempts
-            // with tight re-approach between each, THEN defer loudly.
-            attempts = 0;
-            queue.poll();
-            deferred.add(next);
-            hud("§d[control]§r " + target.toShortString()
-                + " rejected by server (" + lastResult + ") after retries, deferred");
-        }
-        // else: stay on this block - re-approach closer and click again
     }
 
     private static void resetPlacement() {
