@@ -26,10 +26,13 @@ public final class BuildOrder {
 
     public final String name;
     public final List<Placement> placements;
+    /** Optional materials cache (placed backpack/chest) for auto-restock. */
+    public final BlockPos restock;
 
-    private BuildOrder(String name, List<Placement> placements) {
+    private BuildOrder(String name, List<Placement> placements, BlockPos restock) {
         this.name = name;
         this.placements = placements;
+        this.restock = restock;
     }
 
     public static BuildOrder load(Path file) throws Exception {
@@ -53,6 +56,20 @@ public final class BuildOrder {
             oy = o.get(1).getAsInt();
             oz = o.get(2).getAsInt();
         }
+        BlockPos rs = null;
+        if (root.has("restockFromDatum")) {
+            int[] d = PaperclipLens.CONFIG.datum;
+            if (d == null) {
+                throw new Exception("order uses restockFromDatum but no /datum set");
+            }
+            JsonArray o = root.getAsJsonArray("restockFromDatum");
+            rs = new BlockPos(d[0] + o.get(0).getAsInt(),
+                d[1] + o.get(1).getAsInt(), d[2] + o.get(2).getAsInt());
+        } else if (root.has("restock")) {
+            JsonArray o = root.getAsJsonArray("restock");
+            rs = new BlockPos(o.get(0).getAsInt(), o.get(1).getAsInt(),
+                o.get(2).getAsInt());
+        }
         List<Placement> out = new ArrayList<>();
         for (JsonElement e : root.getAsJsonArray("blocks")) {
             JsonObject b = e.getAsJsonObject();
@@ -67,6 +84,6 @@ public final class BuildOrder {
         // placed neighbor when its turn comes). Re-sorting by layer here
         // interleaved distant columns and made the flight path ping-pong
         // across the build at reach-limit distances.
-        return new BuildOrder(name, out);
+        return new BuildOrder(name, out, rs);
     }
 }

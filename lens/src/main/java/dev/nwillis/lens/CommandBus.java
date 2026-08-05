@@ -33,6 +33,9 @@ public final class CommandBus {
                     name + ".png", mc.getMainRenderTarget(), c -> {}));
                 outcome = "screenshot " + name + ".png";
             }
+            case "set" -> outcome = (cmd.has("key") && cmd.has("value"))
+                ? Tunables.set(cmd.get("key").getAsString(), cmd.get("value").getAsDouble())
+                : "set needs key + value";
             case "say" -> {
                 if (mc.player != null && cmd.has("msg")) {
                     mc.player.displayClientMessage(Component.literal(

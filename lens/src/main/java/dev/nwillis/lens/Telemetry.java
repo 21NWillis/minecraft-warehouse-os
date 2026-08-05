@@ -54,6 +54,13 @@ public final class Telemetry {
             first = false;
             sb.append("\"").append(e.getKey()).append("\":").append(e.getValue());
         }
+        sb.append("},\"tunables\":{");
+        first = true;
+        for (Map.Entry<String, Double> e : Tunables.all().entrySet()) {
+            if (!first) sb.append(",");
+            first = false;
+            sb.append("\"").append(e.getKey()).append("\":").append(e.getValue());
+        }
         sb.append("},\"player\":{\"x\":").append(String.format("%.2f", p.getX()))
             .append(",\"y\":").append(String.format("%.2f", p.getY()))
             .append(",\"z\":").append(String.format("%.2f", p.getZ()))

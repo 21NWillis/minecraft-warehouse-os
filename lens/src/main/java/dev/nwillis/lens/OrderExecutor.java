@@ -50,7 +50,7 @@ import java.util.Deque;
  * failures are reported and abandoned.
  */
 public final class OrderExecutor {
-    private enum State { DISARMED, FLYING, PLACING }
+    private enum State { DISARMED, FLYING, PLACING, RESTOCK }
 
     private static KeyMapping armKey;
     private static State state = State.DISARMED;
@@ -66,6 +66,11 @@ public final class OrderExecutor {
     private static String lastResult = "";
     private static final java.util.Map<String, Integer> results = new java.util.TreeMap<>();
     private static BlockPos lastTarget;
+    // restock cache state (order-declared backpack/chest position)
+    private static BlockPos restockPos;
+    private static int restockPhase;   // 0 idle, 1 fly, 2 open, 3 pull, 4 close
+    private static int restockTimer;
+    private static String restockItem;
     // optimistic pipeline: clicks are assumed good and verified 6 ticks
     // later; a revert rolls done back and re-queues the block. Entries:
     // {Placement, deadlineGameTime, support, face, eyeDist, result}
@@ -83,6 +88,8 @@ public final class OrderExecutor {
         queue = new ArrayDeque<>(o.placements);
         deferred = new ArrayDeque<>();
         pendingVerify.clear();
+        restockPos = o.restock;
+        restockPhase = 0;
         done = 0;
         total = o.placements.size();
         passes = 0;
@@ -104,9 +111,15 @@ public final class OrderExecutor {
 
     private static void disarm(String why) {
         if (state != State.DISARMED) {
+            boolean closeCache = state == State.RESTOCK && restockPhase >= 2;
             state = State.DISARMED;
             lastDisarm = why;
             pendingVerify.clear();
+            restockPhase = 0;
+            LocalPlayer p = Minecraft.getInstance().player;
+            if (closeCache && p != null && Minecraft.getInstance().screen != null) {
+                p.closeContainer();
+            }
             say("control released (" + why + ") - " + done + "/" + total + " placed");
         }
     }
@@ -137,14 +150,21 @@ public final class OrderExecutor {
         }
         if (state == State.DISARMED) return;
         LocalPlayer player = mc.player;
-        if (player == null || mc.level == null || mc.screen != null
+        // the ONLY screen that doesn't disarm is the cache container we
+        // opened ourselves mid-restock; human keys still always win
+        boolean screenOk = state == State.RESTOCK && restockPhase >= 2;
+        if (player == null || mc.level == null || (mc.screen != null && !screenOk)
             || player.isDeadOrDying() || player.hurtTime > 0 || humanInput(mc)) {
-            disarm(mc.screen != null ? "screen opened"
+            disarm(mc.screen != null && !screenOk ? "screen opened"
                 : (player != null && player.hurtTime > 0) ? "took damage" : "human input");
             return;
         }
         if (!player.getAbilities().flying) {
             disarm("flight lost");
+            return;
+        }
+        if (state == State.RESTOCK) {
+            runRestock(mc, player);
             return;
         }
 
@@ -177,7 +197,7 @@ public final class OrderExecutor {
                 return;
             }
             passes++;
-            if (passes > 6) {
+            if (passes > Tunables.geti("passLimit")) {
                 say("abandoning " + deferred.size()
                     + " unreachable/unsupported placements  click results: " + results);
                 results.clear();
@@ -217,17 +237,17 @@ public final class OrderExecutor {
         // settling 0.15 onto its OWN fresh block - landing kills the MA
         // flight augment. Feet at +1.35 keeps 0.35 clearance over a
         // filled cell; the eye stays 2.97 from the click face.
-        Vec3 hover = Vec3.atCenterOf(target).add(0, 0.85, 0);
+        Vec3 hover = Vec3.atCenterOf(target).add(0, Tunables.get("hoverHeight"), 0);
         Vec3 delta = hover.subtract(player.position());
         double dist = delta.length();
-        if (dist > 0.9) {
+        if (dist > Tunables.get("approach")) {
             state = State.FLYING;
-            double speed = Math.min(0.9, 0.25 + dist * 0.05);
+            double speed = Math.min(Tunables.get("speedMax"), 0.25 + dist * 0.05);
             Vec3 step = delta.normalize().scale(speed);
             // altitude floor: flight #3 ended because the autopilot flew
             // the body into the ground and the MA flight augment cut out.
             // Never command a descent below one block over the target base.
-            if (player.getY() + step.y < target.getY() + 1.2) {
+            if (player.getY() + step.y < target.getY() + Tunables.get("floor")) {
                 step = new Vec3(step.x, Math.max(step.y, 0), step.z);
             }
             player.setDeltaMovement(step);
@@ -240,7 +260,7 @@ public final class OrderExecutor {
         }
         // brake and settle before interacting
         player.setDeltaMovement(player.getDeltaMovement().scale(0.4));
-        if (settleTicks++ < 2) return;
+        if (settleTicks++ < Tunables.geti("settleTicks")) return;
         state = State.PLACING;
 
         // vanilla refuses to place a block inside an entity - including us.
@@ -264,7 +284,7 @@ public final class OrderExecutor {
                     .add(Vec3.atLowerCornerOf(d.getOpposite().getNormal()).scale(0.5));
                 double fd = player.getEyePosition().distanceTo(face);
                 nearestFace = Math.min(nearestFace, fd);
-                if (fd <= 3.5) {
+                if (fd <= Tunables.get("reach")) {
                     hit = new BlockHitResult(face, d.getOpposite(), support, false);
                     break;
                 }
@@ -273,7 +293,7 @@ public final class OrderExecutor {
         if (hit == null) {
             // orders are support-verified, so "no reachable face" almost
             // always means WE are badly positioned - re-approach and retry
-            if (++attempts < 6) {
+            if (++attempts < Tunables.geti("retryLimit")) {
                 resetPlacement();
                 return;
             }
@@ -291,6 +311,14 @@ public final class OrderExecutor {
 
         int held = holdItem(mc, player, next.block());
         if (held == 0) {
+            if (restockPos != null) {
+                restockItem = next.block();
+                restockPhase = 1;
+                restockTimer = 0;
+                state = State.RESTOCK;
+                say("out of " + restockItem + " - flying to the cache");
+                return;
+            }
             disarm("out of " + next.block() + " (restock and re-arm)");
             return;
         }
@@ -312,7 +340,8 @@ public final class OrderExecutor {
         lastResult = String.valueOf(result);
         results.merge(lastResult, 1, Integer::sum);
         player.swing(InteractionHand.MAIN_HAND);
-        pendingVerify.add(new Object[] { next, mc.level.getGameTime() + 6,
+        pendingVerify.add(new Object[] { next,
+            mc.level.getGameTime() + Tunables.geti("verifyDelay"),
             hit.getBlockPos(), hit.getDirection(),
             player.getEyePosition().distanceTo(hit.getLocation()), lastResult });
         queue.poll();
@@ -325,6 +354,95 @@ public final class OrderExecutor {
         aimTicks = 0;
         verifyTicks = 0;
         settleTicks = 0;
+    }
+
+    /**
+     * Auto-restock from the order's declared cache (a placed backpack or
+     * chest): fly over, open it, QUICK_MOVE matching stacks into the
+     * player inventory, close, resume building. One container op per
+     * tick. Any human input still disarms instantly; ESC (screen gone
+     * mid-pull) counts as human and disarms too.
+     */
+    private static void runRestock(Minecraft mc, LocalPlayer player) {
+        if (restockPhase == 1) {
+            Vec3 hover = Vec3.atCenterOf(restockPos).add(0, 1.2, 0);
+            Vec3 delta = hover.subtract(player.position());
+            if (delta.length() > 1.5) {
+                Vec3 step = delta.normalize().scale(
+                    Math.min(Tunables.get("speedMax"), 0.25 + delta.length() * 0.05));
+                player.setDeltaMovement(step);
+                player.setYRot((float) (Math.atan2(-step.x, step.z) * 180.0 / Math.PI));
+                hud("§d[control]§r restock run: " + restockItem);
+                return;
+            }
+            player.setDeltaMovement(Vec3.ZERO);
+            restockPhase = 2;
+            restockTimer = 0;
+            return;
+        }
+        if (restockPhase == 2) {
+            if (mc.screen != null) {
+                restockPhase = 3;
+                restockTimer = 0;
+                return;
+            }
+            if (restockTimer == 0) {
+                Vec3 face = Vec3.atCenterOf(restockPos).add(0, 0.5, 0);
+                Vec3 look = face.subtract(player.getEyePosition());
+                player.setYRot((float) (Math.atan2(-look.x, look.z) * 180.0 / Math.PI));
+                player.setXRot((float) (-Math.atan2(look.y,
+                    Math.sqrt(look.x * look.x + look.z * look.z)) * 180.0 / Math.PI));
+            }
+            if (restockTimer == 2) {
+                mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND,
+                    new BlockHitResult(Vec3.atCenterOf(restockPos).add(0, 0.5, 0),
+                        Direction.UP, restockPos, false));
+            }
+            if (++restockTimer > 40) {
+                disarm("restock cache at " + restockPos.toShortString() + " won't open");
+            }
+            return;
+        }
+        if (restockPhase == 3) {
+            if (mc.screen == null) {
+                disarm("restock interrupted");
+                return;
+            }
+            ResourceLocation want = ResourceLocation.parse(restockItem);
+            int have = 0;
+            for (int i = 0; i < 36; i++) {
+                ItemStack s = player.getInventory().getItem(i);
+                if (matches(s, want)) have += s.getCount();
+            }
+            if (have >= Tunables.geti("restockKeep")) {
+                restockPhase = 4;
+                return;
+            }
+            var menu = player.containerMenu;
+            for (int i = 0; i < menu.slots.size(); i++) {
+                var slot = menu.slots.get(i);
+                if (slot.container != player.getInventory()
+                    && matches(slot.getItem(), want)) {
+                    mc.gameMode.handleInventoryMouseClick(menu.containerId, i, 0,
+                        ClickType.QUICK_MOVE, player);
+                    return;   // one stack per tick
+                }
+            }
+            // cache has no more of it
+            if (have > 0) {
+                restockPhase = 4;
+            } else {
+                player.closeContainer();
+                disarm("cache is out of " + restockItem);
+            }
+            return;
+        }
+        if (restockPhase == 4) {
+            player.closeContainer();
+            restockPhase = 0;
+            state = State.FLYING;
+            say("restocked " + restockItem + " - resuming");
+        }
     }
 
     /** Remaining materials bill for the HUD; null when no order loaded. */
