@@ -35,10 +35,18 @@ campus shadow for everything that needs sky.
 
 - Deck at y=258: under-campus section = the "carpet". Machines, the
   craftd cell rack, storage annexes, pipez trunks along the ceiling.
-- SUN WING: 40x16 platform extending past the campus edge on a side
-  the OPERATOR designates - one campus side is RESERVED/OFF-LIMITS
-  (un-built-out territory; never plan geometry into it without
-  asking). Hosts gun rows + solar row + Ship One mooring.
+- COMPASS LAW (operator, 2026-08-04): extensions legal to campus
+  NORTH (past the NOC), SOUTH (behind the casino), EAST. WEST IS
+  BANNED - never extend or plan beyond the west edge, ever.
+- Corridor assignments: NORTH = printer row growth (bays 10-12+);
+  EAST = the long-term open-face deck expansion (deepest legal
+  span - spend it slowly); SOUTH = THE SUN WING.
+- SUN WING: 40x16 platform off the south edge behind the casino,
+  open sky by decree. Hosts gun rows + solar row + Ship One
+  mooring. Session-start ritual: operator F10s near the south edge,
+  sitefind-style scan verifies clear volume, wing build order emits
+  fromDatum. The Dyson guns become the casino skyline - the house
+  always wins, and it is solar powered.
 - Open face doctrine: the deck's south and west edges stay unwalled -
   the "giant open platform" for future machines/turtles. Rails of
   glowstone every 8 blocks; no roof except where campus is already
