@@ -1,0 +1,31 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "paperclipos"
+version = "0.1.0"
+displayName = "PaperclipOS Terminal"
+description = "The Paperclip Terminal: a real ordering UI for the warehouse crafting fleet. The GUI is the face; the CC computers stay the brain."
+authors = "nlwillis + Claude"
+
+[[dependencies.paperclipos]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.paperclipos]]
+modId = "computercraft"
+type = "required"
+versionRange = "[1.115,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.paperclipos]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1]"
+ordering = "NONE"
+side = "BOTH"

@@ -318,9 +318,49 @@ local args = { ... }
 -- queue drains through the cells while every UI stays free.
 if args[1] == "serve" then
   local Q = "paperclip.order"
-  print("craftd queue daemon up (file: orderq, rednet: " .. Q .. ")")
+  print("craftd queue daemon up (orderq file, rednet " .. Q .. ", terminals)")
   local queue = {}
+  local lastCatalog = 0
+
+  local function terminals()
+    return { peripheral.find("paperclip_terminal") }
+  end
+
+  local function toastAll(text, okT)
+    for _, t in ipairs(terminals()) do
+      pcall(t.toast, text, okT and true or false)
+    end
+  end
+
+  local function pushCatalog()
+    local have = scanStorage()
+    local entries = {}
+    for item, n in pairs(have) do
+      entries[#entries + 1] = { id = item, name = db.name(item) or item, stock = n }
+    end
+    table.sort(entries, function(a, b) return a.stock > b.stock end)
+    while #entries > 200 do entries[#entries] = nil end
+    for _, t in ipairs(terminals()) do
+      pcall(t.setCatalog, entries)
+    end
+  end
+
+  local function pushQueue(activeLabel)
+    local lines = {}
+    if activeLabel then
+      lines[#lines + 1] = { label = activeLabel, status = "crafting..." }
+    end
+    for _, q in ipairs(queue) do
+      lines[#lines + 1] = { label = q.count .. " x " .. (db.name(q.item) or q.item),
+        status = "queued" }
+    end
+    for _, t in ipairs(terminals()) do
+      pcall(t.setQueue, lines)
+    end
+  end
+
   while true do
+    -- ingest: local file (craftui tab)
     if fs.exists("orderq") then
       local h = fs.open("orderq", "r")
       local text = h.readAll()
@@ -331,20 +371,45 @@ if args[1] == "serve" then
         if item then queue[#queue + 1] = { item = item, count = tonumber(cnt) } end
       end
     end
+    -- ingest: terminal clicks
+    for _, t in ipairs(terminals()) do
+      local okG, orders = pcall(t.getOrders)
+      if okG and type(orders) == "table" then
+        for _, o in ipairs(orders) do
+          queue[#queue + 1] = { item = o.item, count = o.count or 1 }
+          print(("terminal order: %d x %s (%s)"):format(o.count or 1,
+            o.item, tostring(o.player)))
+        end
+      end
+    end
+    -- ingest: rednet (remote computers)
     local sender, msg = rednet.receive(Q, 1)
     if type(msg) == "table" and msg.type == "order" and msg.item then
       queue[#queue + 1] = { item = msg.item, count = msg.count or 1,
         sender = sender, tag = msg.tag }
       rednet.send(sender, { type = "queued", tag = msg.tag, depth = #queue }, Q)
     end
+    -- catalog heartbeat every ~10s
+    if os.clock() - lastCatalog > 10 then
+      lastCatalog = os.clock()
+      pushCatalog()
+      pushQueue(nil)
+    end
+    -- drain one order
     if #queue > 0 then
       local jobO = table.remove(queue, 1)
-      print(("[q:%d] %d x %s"):format(#queue, jobO.count, jobO.item))
+      local label = jobO.count .. " x " .. (db.name(jobO.item) or jobO.item)
+      print(("[q:%d] %s"):format(#queue, label))
+      pushQueue(label)
       local okO, text = order(jobO.count, "id:" .. jobO.item)
+      toastAll(okO and label or (label .. ": " .. tostring(text)), okO)
       if jobO.sender then
         rednet.send(jobO.sender, { type = "result", ok = okO and true or false,
           text = tostring(text), tag = jobO.tag }, Q)
       end
+      pushQueue(nil)
+      pushCatalog()
+      lastCatalog = os.clock()
     end
   end
 end

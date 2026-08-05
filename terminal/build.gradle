@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '1.0.21'
+}
+
+version = '0.1.0'
+group = 'dev.nwillis.paperclipos'
+base.archivesName = 'paperclipos'
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // compile against the pack's own CC:T jar for the peripheral API
+    compileOnly files('../../mods/cc-tweaked-1.21.1-forge-1.120.0.jar')
+}
+
+neoForge {
+    version = '21.1.95'
+
+    runs {
+        client {
+            client()
+        }
+    }
+
+    mods {
+        paperclipos {
+            sourceSet sourceSets.main
+        }
+    }
+}
