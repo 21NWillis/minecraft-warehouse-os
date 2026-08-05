@@ -97,12 +97,22 @@ local function scanStorage()
 end
 
 -- push `count` of `item` into a cell's input chest; pushItems moves at
--- most one stack per call (printfit lesson), so loop every location
+-- most one stack per call (printfit lesson), so loop every location.
+-- pushItems only works WITHIN one wired network: if the target name
+-- does not exist from the source's network, that is a split-network
+-- wiring problem, not a crash.
 local function stage(where, item, count, targetName)
   local remaining = count
   for _, loc in ipairs(where[item] or {}) do
     while remaining > 0 and loc.count > 0 do
-      local moved = loc.store.p.pushItems(targetName, loc.slot, remaining)
+      local okPush, moved = pcall(loc.store.p.pushItems, targetName, loc.slot, remaining)
+      if not okPush then
+        printError(("stage: %s cannot reach %s (%s)"):format(
+          loc.store.name, targetName, tostring(moved)))
+        printError("SPLIT NETWORK: the cell's modem and the storage modems")
+        printError("must share ONE cable tree - not just both touch this computer.")
+        return false
+      end
       if moved == 0 then break end
       remaining = remaining - moved
       loc.count = loc.count - moved
@@ -134,7 +144,8 @@ local function discoverCells()
   while os.clock() < deadline do
     local _, msg = rednet.receive(PROTOCOL, 0.5)
     if type(msg) == "table" and msg.type == "hello" and msg.id and msg.inv then
-      cells[msg.id] = { id = msg.id, busy = 0, inv = msg.inv }
+      cells[msg.id] = { id = msg.id, busy = 0, inv = msg.inv,
+        reachable = peripheral.isPresent(msg.inv) }
     end
   end
 end
@@ -233,6 +244,13 @@ local n = 0
 for _ in pairs(cells) do n = n + 1 end
 print(("craftd online: %d cell(s), %d storage(s)%s"):format(n,
   #storagePeripherals(), cfg.storage and "" or " [auto-discovered]"))
+for id, c in pairs(cells) do
+  if not c.reachable then
+    printError(("cell %s answers rednet but '%s' is NOT on my wired network")
+      :format(id, c.inv))
+    printError("- cable its modem into the same run as the storage modems")
+  end
+end
 if not cfg.storage then
   -- show the whole network's inventories and each verdict, so a bad
   -- wiring day diagnoses itself from the screen
