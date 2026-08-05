@@ -93,7 +93,8 @@ public class TerminalScreen extends Screen {
         });
         search.setHint(Component.literal("search... (or just click a tile)"));
         addRenderableWidget(search);
-        setInitialFocus(search);
+        // no initial focus: the doctrine is zero typing for routine orders;
+        // click the box when you actually want to search
         refresh(true);
     }
 

@@ -79,5 +79,6 @@ nursery.lua
 basewalk.lua
 ratemeter.lua
 netprobe.lua
+termdemo.lua
 data/basewalk_campus.lua
 data/tour_campus.lua
