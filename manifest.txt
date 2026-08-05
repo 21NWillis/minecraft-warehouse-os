@@ -77,5 +77,6 @@ gunfit.lua
 craftui.lua
 nursery.lua
 basewalk.lua
+ratemeter.lua
 data/basewalk_campus.lua
 data/tour_campus.lua
