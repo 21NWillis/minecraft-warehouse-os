@@ -1,7 +1,0 @@
-{
-  "parent": "minecraft:block/cube_column",
-  "textures": {
-    "end": "minecraft:block/purple_concrete",
-    "side": "minecraft:block/observer_back_on"
-  }
-}
