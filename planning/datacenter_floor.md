@@ -35,8 +35,10 @@ campus shadow for everything that needs sky.
 
 - Deck at y=258: under-campus section = the "carpet". Machines, the
   craftd cell rack, storage annexes, pipez trunks along the ceiling.
-- SUN WING: 40x16 platform extending past the campus southern edge,
-  open sky guaranteed by decree. Hosts gun rows + wind masts + solars.
+- SUN WING: 40x16 platform extending past the campus edge on a side
+  the OPERATOR designates - one campus side is RESERVED/OFF-LIMITS
+  (un-built-out territory; never plan geometry into it without
+  asking). Hosts gun rows + solar row + Ship One mooring.
 - Open face doctrine: the deck's south and west edges stay unwalled -
   the "giant open platform" for future machines/turtles. Rails of
   glowstone every 8 blocks; no roof except where campus is already
@@ -56,14 +58,28 @@ Glass: strainer floor sand -> smelt, or trade; 4 panes/sail is light.
 - BOM per new bay: 76 farmland + 76 seeds + pylon + user + chest +
   4 lilypads + hoe + watering can (the standard kit)
 
-## Phase P1 — wind farm (day-one power, all printer-native)
+## Phase P1 — power bootstrap (CORRECTED: the pack DELETED wind)
 
-At y=270+ each Mekanism wind turbine runs near max (~400-480 J/t).
-Chain: metallurgic infuser (osmium+redstone+iron) -> enriched carbon
--> steel -> turbines. Build 12-16 on the sun wing masts, cable to a
-basic energy cube bank.
-- Target: ~5-7 kJ/t = enough for the whole ore-processing line and
-  then some. Retires the three shameful solar panels.
+Recipe-db verified: NO wind_generator recipe exists in this pack -
+the author pre-empted the sky-altitude meta. The corrected ladder:
+
+P1a - SOLAR ROW (day one, all printable): solar panel = 3 glass
+panes + 2 redstone + infused alloy + 3 osmium; solar generator =
+3 panels + 2 alloy + iron + energy tablet + 2 osmium; advanced =
+3 solars + 2 alloy + 3 iron. Chain prereqs: metallurgic infuser
+(4 iron + 2 furnace + 2 redstone + osmium), enriched carbon (coal),
+steel, infused alloy (redstone infusion). Glass panes are the only
+non-printed input (sand -> smelt; strainer floor makes sand).
+Build 6-8 ADVANCED solars on the sun wing. Modest but immediate.
+
+P1b - ETHYLENE FROM SEED SURPLUS (the real interim engine): the
+bays over-produce seeds (+57 uranium, +50 obsidian, +26 gold/iron
+seeds PER MINUTE, measured). Crusher -> bio fuel; electrolytic
+separator -> hydrogen; pressurized reaction chamber -> ethylene;
+gas-burning generators (osmium + alloy + steel casings +
+electrolytic core) burn it hot. Waste seeds become watts - same
+doctrine as trash-into-sails. This carries the factory until the
+gun farm and fission outgrow it.
 
 ## Phase P2 — gun farm on the sun wing (the real curve)
 
