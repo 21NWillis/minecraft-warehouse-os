@@ -23,6 +23,11 @@ if #tArgs >= 1 then
   local h = fs.open(CFG, "w")
   h.write(textutils.serialize(cfg))
   h.close()
+  -- cells self-resurrect: chunk unloads killed the maiden cell, and an
+  -- amnesiac turtle is just a chest with ambition
+  local s = fs.open("startup", "w")
+  s.write('shell.run("craftcell")')
+  s.close()
 elseif fs.exists(CFG) then
   local h = fs.open(CFG, "r")
   cfg = textutils.unserialize(h.readAll())

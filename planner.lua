@@ -19,14 +19,21 @@ function planner.plan(db, have, targetId, targetCount)
   local stats = { served = 0, crafted = 0 }
 
   local function snapshot()
-    local copy = {}
+    local copy, miss = {}, {}
     for k, v in pairs(have) do copy[k] = v end
-    return { have = copy, served = stats.served, crafted = stats.crafted }
+    for k, v in pairs(missing) do miss[k] = v end
+    return { have = copy, missing = miss,
+      served = stats.served, crafted = stats.crafted }
   end
 
   local function restore(snap, stepsMark)
     for k in pairs(have) do have[k] = nil end
     for k, v in pairs(snap.have) do have[k] = v end
+    -- roll missing back too: abandoned branches must not pollute the
+    -- report (the maiden order listed 2772 phantom nuggets from summed
+    -- dead ends of the ingot<->block<->nugget cycle)
+    for k in pairs(missing) do missing[k] = nil end
+    for k, v in pairs(snap.missing) do missing[k] = v end
     stats.served, stats.crafted = snap.served, snap.crafted
     while #steps > stepsMark do steps[#steps] = nil end
   end

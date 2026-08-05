@@ -190,12 +190,18 @@ local function runStep(step, where)
 end
 
 local function order(count, query)
-  local hits = db.search(query, 5)
-  if #hits == 0 then
-    print("no recipe matches: " .. query)
-    return
+  local target
+  if query:sub(1, 3) == "id:" then
+    -- exact form (craftui sends this): what was selected is what runs
+    target = query:sub(4)
+  else
+    local hits = db.search(query, 5)
+    if #hits == 0 then
+      print("no recipe matches: " .. query)
+      return
+    end
+    target = hits[1]
   end
-  local target = hits[1]
   print(("order: %d x %s"):format(count, db.name(target) or target))
   local have, where = scanStorage()
   local steps, missing = planner.plan(db, have, target, count)

@@ -288,13 +288,11 @@ local function draw()
 end
 
 -- ----------------------------------------------------------------- ordering
--- craftd's one-shot mode takes a SEARCH string, and recipedb.search matches
--- the namespace-stripped path - so a full "mod:item" usually finds nothing.
--- Send the id when it really does resolve, otherwise send its path.
+-- What you selected is what gets ordered: craftd's id: form bypasses
+-- its search entirely (the maiden order picked Cast Iron Ingot when
+-- the user chose Iron Ingot - never again).
 local function craftdQuery(id)
-  local ok, hits = pcall(db.search, id, 1)
-  if ok and type(hits) == "table" and hits[1] == id then return id end
-  return (id:match("^[^:]+:(.+)$")) or id
+  return "id:" .. id
 end
 
 -- a key press queues a "char" too; swallow the tail so it doesn't land in the
