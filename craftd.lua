@@ -271,7 +271,21 @@ while true do
   io.write("craft> ")
   local line = read()
   if line == "exit" then break end
-  if line == "cells" then
+  if line:match("^stock") then
+    local filter = line:match("^stock%s+(.+)$")
+    local have = scanStorage()
+    local rows = {}
+    for item, n in pairs(have) do
+      if not filter or item:find(filter, 1, true) then
+        rows[#rows + 1] = { item = item, n = n }
+      end
+    end
+    table.sort(rows, function(a, b) return a.n > b.n end)
+    print(#rows .. " item type(s) visible:")
+    for i = 1, math.min(#rows, 12) do
+      print(("  %6d  %s"):format(rows[i].n, rows[i].item))
+    end
+  elseif line == "cells" then
     discoverCells()
     for id, c in pairs(cells) do
       print(("  %s busy=%d inv=%s"):format(id, c.busy or 0, c.inv))
