@@ -69,6 +69,7 @@ public final class OrderExecutor {
     private static BlockPos logSupport;
     private static Direction logFace;
     private static double logEyeDist;
+    private static BlockPos lastTarget;
 
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         armKey = new KeyMapping("key.paperclip_lens.control", GLFW.GLFW_KEY_F8,
@@ -166,6 +167,11 @@ public final class OrderExecutor {
         }
 
         BlockPos target = next.pos();
+        if (!target.equals(lastTarget)) {
+            lastTarget = target;
+            attempts = 0;
+            resetPlacement();
+        }
         // already satisfied? (previous pass, another builder, us)
         if (!mc.level.getBlockState(target).isAir()) {
             queue.poll();
@@ -173,17 +179,27 @@ public final class OrderExecutor {
             return;
         }
 
-        // hover point: beside-and-above the target for a clean downward click.
-        // After any failed attempt, demand a tight approach - runs of blocks
-        // placed from one stale hover position put far-side clicks right at
-        // the reach limit, which is where placements start silently missing.
-        Vec3 hover = Vec3.atCenterOf(target).add(0, 1.8, 0);
+        // Hover BESIDE the target, slightly above: flight #3's placelog
+        // showed straight-overhead hovers put every click at 3.8-4.0 eye
+        // distance - the silent-miss zone. A side offset at +0.9 brings
+        // clicks to ~2.9. After a failed attempt, demand a tight approach.
+        Vec3 tc = Vec3.atCenterOf(target);
+        Vec3 away = player.position().subtract(tc).multiply(1, 0, 1);
+        away = away.lengthSqr() < 0.01 ? new Vec3(1.5, 0, 0)
+            : away.normalize().scale(1.5);
+        Vec3 hover = tc.add(away).add(0, 0.9, 0);
         Vec3 delta = hover.subtract(player.position());
         double dist = delta.length();
-        if (dist > (attempts > 0 ? 1.2 : 3.5)) {
+        if (dist > (attempts > 0 ? 1.0 : 2.5)) {
             state = State.FLYING;
             double speed = Math.min(0.9, 0.25 + dist * 0.05);
             Vec3 step = delta.normalize().scale(speed);
+            // altitude floor: flight #3 ended because the autopilot flew
+            // the body into the ground and the MA flight augment cut out.
+            // Never command a descent below one block over the target base.
+            if (player.getY() + step.y < target.getY() + 0.9) {
+                step = new Vec3(step.x, Math.max(step.y, 0), step.z);
+            }
             player.setDeltaMovement(step);
             // face travel direction; feels intentional, reads as piloting
             player.setYRot((float) (Math.atan2(-step.x, step.z) * 180.0 / Math.PI));
@@ -214,7 +230,7 @@ public final class OrderExecutor {
                 && !mc.level.getBlockState(support).canBeReplaced()) {
                 Vec3 face = Vec3.atCenterOf(support)
                     .add(Vec3.atLowerCornerOf(d.getOpposite().getNormal()).scale(0.5));
-                if (player.getEyePosition().distanceTo(face) <= 4.2) {
+                if (player.getEyePosition().distanceTo(face) <= 3.5) {
                     hit = new BlockHitResult(face, d.getOpposite(), support, false);
                     break;
                 }

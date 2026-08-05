@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -63,12 +62,11 @@ public final class BuildOrder {
                 oz + b.get("z").getAsInt()),
                 b.get("b").getAsString()));
         }
-        // build bottom-up, then in scanline order - keeps support below
-        // and the flight path coherent
-        out.sort(Comparator
-            .comparingInt((Placement p) -> p.pos().getY())
-            .thenComparingInt(p -> p.pos().getZ())
-            .thenComparingInt(p -> p.pos().getX()));
+        // Trust the file's ordering: orders are authored in placement
+        // sequence (dev-side support checker guarantees each block has a
+        // placed neighbor when its turn comes). Re-sorting by layer here
+        // interleaved distant columns and made the flight path ping-pong
+        // across the build at reach-limit distances.
         return new BuildOrder(name, out);
     }
 }
