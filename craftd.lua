@@ -47,6 +47,25 @@ end
 -- ---------------------------------------------------------------- storage
 local cells = {}   -- filled by discoverCells; needed to exclude cell invs
 
+-- Advanced Peripherals integration (activates automatically when the
+-- server gets AP): the ME Bridge folds AE2 network stock into the
+-- storage view and stages straight into cells; the Chat Box takes
+-- !craft orders from anywhere and announces results. AP's Lua API
+-- drifts between versions, so every call is pcall-armored - expect a
+-- short field-rename session on first contact.
+local function meBridge()
+  return peripheral.find("meBridge")
+end
+
+local function chatBox()
+  return peripheral.find("chatBox")
+end
+
+local function chatSay(msg)
+  local cb = chatBox()
+  if cb then pcall(cb.sendMessage, msg, "PaperclipOS") end
+end
+
 -- Controllers are PULL-ONLY: reading and extracting from the SS
 -- controller works (that is how the whole spine becomes visible with
 -- one modem) but inserting into it voids items - the emerald famine.
@@ -93,6 +112,21 @@ local function scanStorage()
       printError(("storage %s unreadable: %s"):format(s.name, tostring(listing)))
     end
   end
+  -- AE2 network stock via the ME Bridge (pull-only, like the controller)
+  local me = meBridge()
+  if me then
+    local okMe, items = pcall(me.listItems)
+    if okMe and type(items) == "table" then
+      for _, item in ipairs(items) do
+        local n = item.amount or item.count or 0
+        if item.name and n > 0 then
+          have[item.name] = (have[item.name] or 0) + n
+          where[item.name] = where[item.name] or {}
+          table.insert(where[item.name], { me = true, count = n })
+        end
+      end
+    end
+  end
   return have, where
 end
 
@@ -104,7 +138,19 @@ end
 local function stage(where, item, count, targetName)
   local remaining = count
   for _, loc in ipairs(where[item] or {}) do
-    while remaining > 0 and loc.count > 0 do
+    -- AE2 location: export straight from the ME network into the cell
+    if loc.me then
+      local me = meBridge()
+      while remaining > 0 and loc.count > 0 and me do
+        local okExp, moved = pcall(me.exportItemToPeripheral,
+          { name = item, count = math.min(remaining, 64) }, targetName)
+        if not okExp or not moved or moved == 0 then break end
+        remaining = remaining - moved
+        loc.count = loc.count - moved
+      end
+      if remaining <= 0 then break end
+    end
+    while not loc.me and remaining > 0 and loc.count > 0 do
       local okPush, moved = pcall(loc.store.p.pushItems, targetName, loc.slot, remaining)
       if not okPush then
         printError(("stage: %s cannot reach %s (%s)"):format(
@@ -246,6 +292,19 @@ local function order(count, query)
   local have, where = scanStorage()
   local steps, missing = planner.plan(db, have, target, count)
   if not steps then
+    -- our cells can't make it; can AE2's crafting CPUs? (patterned
+    -- recipes forwarded via the ME Bridge, fire-and-forget)
+    local me = meBridge()
+    if me then
+      local okC, craftable = pcall(me.isItemCraftable, { name = target })
+      if okC and craftable then
+        local okS = pcall(me.craftItem, { name = target, count = count })
+        if okS then
+          print("forwarded to AE2 crafting CPUs")
+          return true, ("%d x %s -> AE2 CPUs"):format(count, db.name(target) or target)
+        end
+      end
+    end
     print("cannot craft - missing:")
     local first
     for item, n in pairs(missing) do
@@ -382,8 +441,51 @@ if args[1] == "serve" then
         end
       end
     end
-    -- ingest: rednet (remote computers)
-    local sender, msg = rednet.receive(Q, 1)
+    -- ingest: one event pump for rednet, AP chat, and the tick timer.
+    -- (rednet.receive DISCARDS other events - it would eat chat.)
+    local sender, msg
+    do
+      local timer = os.startTimer(1)
+      while true do
+        local ev = { os.pullEvent() }
+        if ev[1] == "timer" and ev[2] == timer then
+          break
+        elseif ev[1] == "rednet_message" and ev[4] == Q then
+          sender, msg = ev[2], ev[3]
+          os.cancelTimer(timer)
+          break
+        elseif ev[1] == "chat" then
+          -- AP Chat Box: order from anywhere in the world.
+          --   !craft <count> <query>   !stock <query>   !queue
+          local user, text = ev[2], tostring(ev[3])
+          local cnt, cq = text:match("^!craft%s+(%d+)%s+(.+)$")
+          if cnt and cq then
+            local hits = db.search(cq, 1)
+            if #hits == 0 then
+              chatSay("no recipe matches '" .. cq .. "'")
+            else
+              queue[#queue + 1] = { item = hits[1], count = tonumber(cnt) }
+              chatSay(("queued %s x %s (#%d) for %s"):format(cnt,
+                db.name(hits[1]) or hits[1], #queue, tostring(user)))
+            end
+          elseif text == "!queue" then
+            chatSay(#queue == 0 and "queue empty"
+              or (#queue .. " order(s) queued"))
+          elseif text:match("^!stock%s+") then
+            local sq = text:match("^!stock%s+(.+)$")
+            local haveNow = scanStorage()
+            local best, bestN
+            for itm, n in pairs(haveNow) do
+              if itm:find(sq, 1, true) and (not bestN or n > bestN) then
+                best, bestN = itm, n
+              end
+            end
+            chatSay(best and (bestN .. " x " .. best)
+              or ("no stock matching " .. sq))
+          end
+        end
+      end
+    end
     if type(msg) == "table" and msg.type == "order" and msg.item then
       queue[#queue + 1] = { item = msg.item, count = msg.count or 1,
         sender = sender, tag = msg.tag }
@@ -403,6 +505,7 @@ if args[1] == "serve" then
       pushQueue(label)
       local okO, text = order(jobO.count, "id:" .. jobO.item)
       toastAll(okO and label or (label .. ": " .. tostring(text)), okO)
+      chatSay((okO and "done: " or "FAILED: ") .. label)
       if jobO.sender then
         rednet.send(jobO.sender, { type = "result", ok = okO and true or false,
           text = tostring(text), tag = jobO.tag }, Q)
