@@ -59,6 +59,12 @@ public final class OrderExecutor {
     private static Deque<BuildOrder.Placement> deferred = new ArrayDeque<>();
     private static int done, total, passes;
     private static int settleTicks;
+    // per-placement micro-state: aim a tick before clicking (rotation and
+    // hotbar selection sync to the server on the NEXT tick's packets), then
+    // wait out the server round-trip and verify the block really exists
+    private static int aimTicks, verifyTicks, attempts;
+    private static String lastResult = "";
+    private static final java.util.Map<String, Integer> results = new java.util.TreeMap<>();
 
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         armKey = new KeyMapping("key.paperclip_lens.control", GLFW.GLFW_KEY_F8,
@@ -134,14 +140,18 @@ public final class OrderExecutor {
         BuildOrder.Placement next = queue.peek();
         if (next == null) {
             if (deferred.isEmpty()) {
-                say("order '" + order.name + "' COMPLETE: " + done + "/" + total);
+                say("order '" + order.name + "' COMPLETE: " + done + "/" + total
+                    + "  click results: " + results);
+                results.clear();
                 state = State.DISARMED;
                 order = null;
                 return;
             }
             passes++;
             if (passes > 3) {
-                say("abandoning " + deferred.size() + " unreachable/unsupported placements");
+                say("abandoning " + deferred.size()
+                    + " unreachable/unsupported placements  click results: " + results);
+                results.clear();
                 queue.clear();
                 deferred.clear();
                 return;
@@ -180,6 +190,15 @@ public final class OrderExecutor {
         if (settleTicks++ < 4) return;
         state = State.PLACING;
 
+        // vanilla refuses to place a block inside an entity - including us.
+        // If our hitbox overlaps the target cell, drift up and out first.
+        if (player.getBoundingBox().inflate(0.05).intersects(
+                new net.minecraft.world.phys.AABB(target))) {
+            player.setDeltaMovement(0, 0.25, 0);
+            resetPlacement();
+            return;
+        }
+
         // find a solid neighbor face to click
         BlockHitResult hit = null;
         for (Direction d : Direction.values()) {
@@ -197,26 +216,55 @@ public final class OrderExecutor {
         if (hit == null) {
             queue.poll();
             deferred.add(next);
+            resetPlacement();
             hud("§d[control]§r deferred " + target.toShortString()
                 + " (no reachable support)");
             return;
         }
 
-        if (!holdItem(mc, player, next.block())) {
+        int held = holdItem(mc, player, next.block());
+        if (held == 0) {
             disarm("out of " + next.block() + " (restock and re-arm)");
             return;
         }
 
-        // look at the click point, then place
+        // aim now; the click waits a tick so the server has our rotation
+        // and hotbar selection BEFORE the use packet arrives (a swap this
+        // tick costs one more tick of settling)
         Vec3 eye = player.getEyePosition();
         Vec3 look = hit.getLocation().subtract(eye);
         player.setYRot((float) (Math.atan2(-look.x, look.z) * 180.0 / Math.PI));
         player.setXRot((float) (-Math.atan2(look.y,
             Math.sqrt(look.x * look.x + look.z * look.z)) * 180.0 / Math.PI));
-        mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
-        player.swing(InteractionHand.MAIN_HAND);
-        queue.poll();
-        done++;
+        if (held == 2 || aimTicks++ < 1) return;
+
+        if (verifyTicks == 0) {
+            var result = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
+            lastResult = String.valueOf(result);
+            results.merge(lastResult, 1, Integer::sum);
+            player.swing(InteractionHand.MAIN_HAND);
+        }
+        // client prediction shows the block instantly; only the server's
+        // answer counts, so wait out the round-trip before judging
+        if (++verifyTicks < 5) return;
+        boolean placed = !mc.level.getBlockState(target).isAir();
+        resetPlacement();
+        if (placed) {
+            queue.poll();
+            done++;
+            attempts = 0;
+        } else if (++attempts >= 2) {
+            attempts = 0;
+            queue.poll();
+            deferred.add(next);
+            hud("§d[control]§r " + target.toShortString()
+                + " rejected by server (" + lastResult + "), deferred");
+        }
+    }
+
+    private static void resetPlacement() {
+        aimTicks = 0;
+        verifyTicks = 0;
         settleTicks = 0;
     }
 
@@ -237,17 +285,21 @@ public final class OrderExecutor {
         return state != State.DISARMED;
     }
 
-    /** Ensure the required block item is in the selected hotbar slot. */
-    private static boolean holdItem(Minecraft mc, LocalPlayer player, String blockId) {
+    /**
+     * Ensure the required block item is in the selected hotbar slot.
+     * Returns 0 = not found, 1 = already in hand, 2 = moved this tick
+     * (caller must wait a tick for the server to learn about it).
+     */
+    private static int holdItem(Minecraft mc, LocalPlayer player, String blockId) {
         Inventory inv = player.getInventory();
         ResourceLocation want = ResourceLocation.parse(blockId);
         // already holding it?
-        if (matches(inv.getSelected(), want)) return true;
+        if (matches(inv.getSelected(), want)) return 1;
         // in the hotbar?
         for (int slot = 0; slot < 9; slot++) {
             if (matches(inv.getItem(slot), want)) {
                 inv.selected = slot;
-                return true;
+                return 2;
             }
         }
         // in the backpack rows? swap it into the selected hotbar slot
@@ -257,10 +309,10 @@ public final class OrderExecutor {
                     player.inventoryMenu.containerId,
                     slot < 27 ? slot + 9 : slot - 27,   // container slot mapping
                     inv.selected, ClickType.SWAP, player);
-                return matches(inv.getSelected(), want);
+                return matches(inv.getSelected(), want) ? 2 : 0;
             }
         }
-        return false;
+        return 0;
     }
 
     private static boolean matches(ItemStack stack, ResourceLocation want) {
