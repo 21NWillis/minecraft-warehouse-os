@@ -6,10 +6,11 @@
 -- Drain cell -> push exact BOM into the turtle -> send job -> pull
 -- results back to storage. No per-cell chests exist.
 --
--- SETUP: craftd.cfg on this computer:
+-- SETUP: none. Storage auto-discovers: every inventory on the wired
+-- network counts, EXCLUDING cell turtles and anything whose name
+-- mentions "controller" (the SS controller refuses automation inserts -
+-- the ancient wound stays closed). Optional craftd.cfg overrides:
 --   { storage = { "chestName1", "chestName2", ... } }
--- (peripheral names of the storage chests on the wired network - the
--- collector chest and friends. NEVER a controller.)
 --
 -- USAGE:
 --   craftd                       interactive: order loop
@@ -21,13 +22,12 @@ local hub = require("crafthub")
 local PROTOCOL = "paperclip.craft"
 local CFG = "craftd.cfg"
 
-if not fs.exists(CFG) then
-  print("write " .. CFG .. ' first: { storage = { "chest_name", ... } }')
-  return
+local cfg = {}
+if fs.exists(CFG) then
+  local cfgFile = fs.open(CFG, "r")
+  cfg = textutils.unserialize(cfgFile.readAll()) or {}
+  cfgFile.close()
 end
-local cfgFile = fs.open(CFG, "r")
-local cfg = textutils.unserialize(cfgFile.readAll())
-cfgFile.close()
 
 for _, side in ipairs(peripheral.getNames()) do
   if peripheral.getType(side) == "modem" then
@@ -44,9 +44,27 @@ if not ok then
 end
 
 -- ---------------------------------------------------------------- storage
+local cells = {}   -- filled by discoverCells; needed to exclude cell invs
+
 local function storagePeripherals()
+  local names
+  if cfg.storage then
+    names = cfg.storage
+  else
+    names = {}
+    local cellInvs = {}
+    for _, c in pairs(cells) do cellInvs[c.inv] = true end
+    for _, name in ipairs(peripheral.getNames()) do
+      if peripheral.hasType(name, "inventory")
+          and not peripheral.hasType(name, "turtle")
+          and not name:find("controller")
+          and not cellInvs[name] then
+        names[#names + 1] = name
+      end
+    end
+  end
   local out = {}
-  for _, name in ipairs(cfg.storage) do
+  for _, name in ipairs(names) do
     local p = peripheral.wrap(name)
     if p and p.list then out[#out + 1] = { name = name, p = p } end
   end
@@ -96,8 +114,6 @@ local function collect(invName)
 end
 
 -- ------------------------------------------------------------------ cells
-local cells = {}
-
 local function discoverCells()
   rednet.broadcast({ type = "ping" }, PROTOCOL)
   local deadline = os.clock() + 2
@@ -195,7 +211,8 @@ end
 discoverCells()
 local n = 0
 for _ in pairs(cells) do n = n + 1 end
-print(("craftd online: %d cell(s), %d storage(s)"):format(n, #cfg.storage))
+print(("craftd online: %d cell(s), %d storage(s)%s"):format(n,
+  #storagePeripherals(), cfg.storage and "" or " [auto-discovered]"))
 
 local args = { ... }
 if #args >= 2 then
