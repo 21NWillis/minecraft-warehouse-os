@@ -213,6 +213,25 @@ local n = 0
 for _ in pairs(cells) do n = n + 1 end
 print(("craftd online: %d cell(s), %d storage(s)%s"):format(n,
   #storagePeripherals(), cfg.storage and "" or " [auto-discovered]"))
+if not cfg.storage then
+  -- show the whole network's inventories and each verdict, so a bad
+  -- wiring day diagnoses itself from the screen
+  local cellInvs = {}
+  for _, c in pairs(cells) do cellInvs[c.inv] = true end
+  for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.hasType(name, "inventory") then
+      local verdict = "STORAGE"
+      if peripheral.hasType(name, "turtle") then verdict = "skip: turtle"
+      elseif name:find("controller") then verdict = "skip: controller (the wound)"
+      elseif cellInvs[name] then verdict = "skip: craft cell" end
+      print(("  %-40s %s"):format(name, verdict))
+    end
+  end
+  if #storagePeripherals() == 0 then
+    print("NO STORAGE ON THE WIRE: connect the essence chest(s) to this")
+    print("computer's wired network (wired modem + cable), then rerun.")
+  end
+end
 
 local args = { ... }
 if #args >= 2 then
