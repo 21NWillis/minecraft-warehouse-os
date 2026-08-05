@@ -1,9 +1,10 @@
 -- craftd: the dispatcher daemon (design: planning/craftd.md).
--- Runs on the warehouse computer (wired modem to all storage + cell
--- chests, wireless modem for the cell channel). Takes an order, plans
--- it with planner against live storage, stages ingredients into cell
--- input chests via the peripheral API, dispatches batches across all
--- idle cells, routes outputs back to storage.
+-- Runs on the warehouse computer (wired modem to storage, wireless for
+-- the cell channel). Takes an order, plans it with planner against live
+-- storage, and drives DOCKLESS cells: each cell turtle sits on a wired
+-- modem, so its own 16 slots are the staging chest AND the output chest.
+-- Drain cell -> push exact BOM into the turtle -> send job -> pull
+-- results back to storage. No per-cell chests exist.
 --
 -- SETUP: craftd.cfg on this computer:
 --   { storage = { "chestName1", "chestName2", ... } }
@@ -81,9 +82,10 @@ local function stage(where, item, count, targetName)
   return remaining <= 0
 end
 
--- drain a cell's output chest back into storage
-local function collect(outputName)
-  local out = peripheral.wrap(outputName)
+-- drain a cell turtle back into storage (also used pre-stage so the
+-- cell always starts a job empty)
+local function collect(invName)
+  local out = peripheral.wrap(invName)
   if not (out and out.list) then return end
   for slot in pairs(out.list()) do
     for _, s in ipairs(storagePeripherals()) do
@@ -101,9 +103,8 @@ local function discoverCells()
   local deadline = os.clock() + 2
   while os.clock() < deadline do
     local _, msg = rednet.receive(PROTOCOL, 0.5)
-    if type(msg) == "table" and msg.type == "hello" and msg.id then
-      cells[msg.id] = { id = msg.id, busy = 0,
-        input = msg.input, output = msg.output }
+    if type(msg) == "table" and msg.type == "hello" and msg.id and msg.inv then
+      cells[msg.id] = { id = msg.id, busy = 0, inv = msg.inv }
     end
   end
 end
@@ -122,9 +123,10 @@ local function runStep(step, where)
       if not cell or (cell.busy or 0) > 0 then break end
       local batch = batches[bi]
       local totals = hub.stageTotals(step, batch)
+      collect(cell.inv)   -- cell must start a job empty (dockless doctrine)
       local staged = true
       for item, count in pairs(totals) do
-        if not stage(where, item, count, cell.input) then
+        if not stage(where, item, count, cell.inv) then
           staged = false
           break
         end
@@ -146,7 +148,7 @@ local function runStep(step, where)
         and inFlight[msg.job] then
       local cell = inFlight[msg.job]
       cell.busy = cell.busy - 1
-      collect(cell.output)
+      collect(cell.inv)
       inFlight[msg.job] = nil
       if msg.type == "error" then
         return false, ("cell %s: %s"):format(msg.id, tostring(msg.err))
@@ -208,7 +210,7 @@ while true do
   if line == "cells" then
     discoverCells()
     for id, c in pairs(cells) do
-      print(("  %s busy=%d in=%s"):format(id, c.busy or 0, c.input))
+      print(("  %s busy=%d inv=%s"):format(id, c.busy or 0, c.inv))
     end
   elseif line and line ~= "" then
     local count, query = line:match("^(%d+)%s+(.+)$")
