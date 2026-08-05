@@ -3,7 +3,7 @@ plugins {
     id 'net.neoforged.moddev' version '1.0.21'
 }
 
-version = '0.2.0'
+version = '0.3.0'
 group = 'dev.nwillis.lens'
 base.archivesName = 'paperclip-lens'
 

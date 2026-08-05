@@ -18,7 +18,9 @@ import java.util.List;
  *   { "name": "gun row", "origin": [x,y,z] (optional, default absolute),
  *     "blocks": [ {"x":1,"y":0,"z":4,"b":"minecraft:deepslate"}, ... ] }
  * If "origin" is present, block coords are relative to it; otherwise
- * they are absolute world coordinates.
+ * they are absolute world coordinates. Alternatively "fromDatum":
+ * [dx,dy,dz] anchors the order at the /datum position plus that offset -
+ * the preferred form, since orders then never carry world coordinates.
  */
 public final class BuildOrder {
     public record Placement(BlockPos pos, String block) {}
@@ -36,7 +38,17 @@ public final class BuildOrder {
         String name = root.has("name") ? root.get("name").getAsString()
             : file.getFileName().toString();
         int ox = 0, oy = 0, oz = 0;
-        if (root.has("origin")) {
+        if (root.has("fromDatum")) {
+            int[] d = PaperclipLens.CONFIG.datum;
+            if (d == null) {
+                throw new Exception(
+                    "order uses fromDatum but no datum is set - run /datum on it");
+            }
+            JsonArray o = root.getAsJsonArray("fromDatum");
+            ox = d[0] + o.get(0).getAsInt();
+            oy = d[1] + o.get(1).getAsInt();
+            oz = d[2] + o.get(2).getAsInt();
+        } else if (root.has("origin")) {
             JsonArray o = root.getAsJsonArray("origin");
             ox = o.get(0).getAsInt();
             oy = o.get(1).getAsInt();

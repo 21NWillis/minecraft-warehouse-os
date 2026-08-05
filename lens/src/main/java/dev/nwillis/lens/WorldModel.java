@@ -51,26 +51,41 @@ public final class WorldModel {
         snapshotKey = new KeyMapping("key.paperclip_lens.snapshot", GLFW.GLFW_KEY_F10,
             "key.categories.paperclip_lens");
         event.register(snapshotKey);
+        arm();
+    }
 
+    /**
+     * (Re)build sweep state from the configured corners. Called at startup
+     * and again by /bottomleft + /topright, so bounds set in game take
+     * effect immediately. Changing bounds resets the model - the journal
+     * file survives, the in-memory diff base starts over.
+     */
+    public static String arm() {
         int[] min = PaperclipLens.CONFIG.baseMin;
         int[] max = PaperclipLens.CONFIG.baseMax;
         boundsOk = min != null && max != null && min.length == 3 && max.length == 3;
-        if (boundsOk) {
-            minX = Math.min(min[0], max[0]);
-            minY = Math.min(min[1], max[1]);
-            minZ = Math.min(min[2], max[2]);
-            sizeX = Math.abs(max[0] - min[0]) + 1;
-            sizeY = Math.abs(max[1] - min[1]) + 1;
-            sizeZ = Math.abs(max[2] - min[2]) + 1;
-            cells = (long) sizeX * sizeY * sizeZ;
-            paletteIds.put("minecraft:air", AIR);
-            paletteNames.put(AIR, "minecraft:air");
-            PaperclipLens.LOG.info("world model armed: {}x{}x{} = {} cells",
-                sizeX, sizeY, sizeZ, cells);
-        } else {
+        if (!boundsOk) {
             PaperclipLens.LOG.info(
-                "world model idle: set baseMin/baseMax in paperclip_lens.json");
+                "world model idle: set both corners (/bottomleft, /topright)");
+            return "world model idle: set the other corner";
         }
+        model.clear();
+        paletteIds.clear();
+        paletteNames.clear();
+        cursor = 0;
+        minX = Math.min(min[0], max[0]);
+        minY = Math.min(min[1], max[1]);
+        minZ = Math.min(min[2], max[2]);
+        sizeX = Math.abs(max[0] - min[0]) + 1;
+        sizeY = Math.abs(max[1] - min[1]) + 1;
+        sizeZ = Math.abs(max[2] - min[2]) + 1;
+        cells = (long) sizeX * sizeY * sizeZ;
+        paletteIds.put("minecraft:air", AIR);
+        paletteNames.put(AIR, "minecraft:air");
+        String status = "world model armed: " + sizeX + "x" + sizeY + "x" + sizeZ
+            + " = " + cells + " cells";
+        PaperclipLens.LOG.info(status);
+        return status;
     }
 
     private static Path dir() {

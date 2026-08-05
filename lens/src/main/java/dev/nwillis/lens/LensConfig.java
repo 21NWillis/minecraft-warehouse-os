@@ -33,9 +33,15 @@ public final class LensConfig {
     /**
      * World model bounds (two [x,y,z] corners, any order). null = the
      * model/journal/snapshot system stays idle. Cover the tower + campus.
+     * Set in game: stand at each corner and run /bottomleft, /topright.
      */
     public int[] baseMin = null;
     public int[] baseMax = null;
+    /**
+     * The campus datum block position - set in game with /datum while
+     * standing on it. Build orders with "fromDatum" resolve against it.
+     */
+    public int[] datum = null;
     /** Dimension the model watches. */
     public String modelDimension = "minecraft:overworld";
     /** Sweep rate: blocks diffed per client tick (20/s). */
@@ -57,5 +63,14 @@ public final class LensConfig {
         } catch (IOException ignored) {
         }
         return fresh;
+    }
+
+    public void save(Path configDir) {
+        try {
+            Files.createDirectories(configDir);
+            Files.writeString(configDir.resolve("paperclip_lens.json"), GSON.toJson(this));
+        } catch (IOException e) {
+            PaperclipLens.LOG.warn("config save failed: {}", e.toString());
+        }
     }
 }

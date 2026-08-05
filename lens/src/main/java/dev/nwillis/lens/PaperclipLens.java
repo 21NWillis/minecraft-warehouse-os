@@ -28,6 +28,7 @@ public class PaperclipLens {
         modBus.addListener(WorldModel::registerKeys);
         modBus.addListener(OrderExecutor::registerKeys);
         modBus.addListener(BlockBlame::registerKeys);
+        NeoForge.EVENT_BUS.addListener(ClientCommands::register);
         NeoForge.EVENT_BUS.addListener(TooltipHandler::onTooltip);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onClientTick);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onRenderLevel);
