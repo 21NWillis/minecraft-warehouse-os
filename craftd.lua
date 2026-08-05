@@ -46,6 +46,10 @@ end
 -- ---------------------------------------------------------------- storage
 local cells = {}   -- filled by discoverCells; needed to exclude cell invs
 
+-- Controllers are PULL-ONLY: reading and extracting from the SS
+-- controller works (that is how the whole spine becomes visible with
+-- one modem) but inserting into it voids items - the emerald famine.
+-- Results only ever return to insertable (non-controller) storage.
 local function storagePeripherals()
   local names
   if cfg.storage then
@@ -57,7 +61,6 @@ local function storagePeripherals()
     for _, name in ipairs(peripheral.getNames()) do
       if peripheral.hasType(name, "inventory")
           and not peripheral.hasType(name, "turtle")
-          and not name:find("controller")
           and not cellInvs[name] then
         names[#names + 1] = name
       end
@@ -66,7 +69,10 @@ local function storagePeripherals()
   local out = {}
   for _, name in ipairs(names) do
     local p = peripheral.wrap(name)
-    if p and p.list then out[#out + 1] = { name = name, p = p } end
+    if p and p.list then
+      out[#out + 1] = { name = name, p = p,
+        pullOnly = name:find("controller") ~= nil }
+    end
   end
   return out
 end
@@ -75,10 +81,15 @@ end
 local function scanStorage()
   local have, where = {}, {}
   for _, s in ipairs(storagePeripherals()) do
-    for slot, item in pairs(s.p.list()) do
-      have[item.name] = (have[item.name] or 0) + item.count
-      where[item.name] = where[item.name] or {}
-      table.insert(where[item.name], { store = s, slot = slot, count = item.count })
+    local okList, listing = pcall(s.p.list)
+    if okList and listing then
+      for slot, item in pairs(listing) do
+        have[item.name] = (have[item.name] or 0) + item.count
+        where[item.name] = where[item.name] or {}
+        table.insert(where[item.name], { store = s, slot = slot, count = item.count })
+      end
+    else
+      printError(("storage %s unreadable: %s"):format(s.name, tostring(listing)))
     end
   end
   return have, where
@@ -107,8 +118,10 @@ local function collect(invName)
   if not (out and out.list) then return end
   for slot in pairs(out.list()) do
     for _, s in ipairs(storagePeripherals()) do
-      while out.pushItems(s.name, slot) > 0 do end
-      if not out.list()[slot] then break end
+      if not s.pullOnly then
+        while out.pushItems(s.name, slot) > 0 do end
+        if not out.list()[slot] then break end
+      end
     end
   end
 end
@@ -218,18 +231,26 @@ if not cfg.storage then
   -- wiring day diagnoses itself from the screen
   local cellInvs = {}
   for _, c in pairs(cells) do cellInvs[c.inv] = true end
+  local insertable = 0
   for _, name in ipairs(peripheral.getNames()) do
     if peripheral.hasType(name, "inventory") then
       local verdict = "STORAGE"
       if peripheral.hasType(name, "turtle") then verdict = "skip: turtle"
-      elseif name:find("controller") then verdict = "skip: controller (the wound)"
-      elseif cellInvs[name] then verdict = "skip: craft cell" end
+      elseif cellInvs[name] then verdict = "skip: craft cell"
+      elseif name:find("controller") then
+        verdict = "STORAGE (pull-only: never insert into a controller)"
+      else
+        insertable = insertable + 1
+      end
       print(("  %-40s %s"):format(name, verdict))
     end
   end
   if #storagePeripherals() == 0 then
-    print("NO STORAGE ON THE WIRE: connect the essence chest(s) to this")
-    print("computer's wired network (wired modem + cable), then rerun.")
+    print("NO STORAGE ON THE WIRE: modem the SS controller (pull-only")
+    print("spine visibility) plus ONE plain chest (the return tray).")
+  elseif insertable == 0 then
+    print("WARNING: no insertable storage - results have nowhere to go.")
+    print("Wire ONE plain chest as the return tray.")
   end
 end
 
