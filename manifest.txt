@@ -78,5 +78,6 @@ craftui.lua
 nursery.lua
 basewalk.lua
 ratemeter.lua
+netprobe.lua
 data/basewalk_campus.lua
 data/tour_campus.lua
