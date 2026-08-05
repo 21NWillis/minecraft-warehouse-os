@@ -39,20 +39,29 @@ end
 
 -- the wired modem is everything: it names this turtle on the item
 -- network AND carries the rednet job channel. No wireless needed.
-local invName
+-- MULTIPLE modems can touch a turtle (leftovers from rewiring), each
+-- binding it under a DIFFERENT name - announce every name we hold and
+-- let the hub use whichever is reachable on its network.
+local invNames = {}
 for _, side in ipairs({ "left", "right", "top", "bottom", "front", "back" }) do
   if peripheral.getType(side) == "modem" then
     local m = peripheral.wrap(side)
     if m.isWireless and not m.isWireless() then
-      invName = m.getNameLocal()
+      local okN, name = pcall(m.getNameLocal)
+      if okN and name then invNames[#invNames + 1] = name end
     end
     rednet.open(side)
   end
 end
-if not invName then
+if #invNames == 0 then
   print("no ACTIVE wired modem touching me - park me on the spine and")
   print("right-click the modem (red ring must be lit), then rerun")
   return
+end
+local invName = invNames[1]
+if #invNames > 1 then
+  print("WARNING: " .. #invNames .. " wired modems touch me ("
+    .. table.concat(invNames, ", ") .. ") - remove the stale ones")
 end
 
 local function snapshot()
@@ -104,16 +113,17 @@ local function runJob(job)
   return true   -- results stay aboard; the hub pulls them over the wire
 end
 
-print(("craftcell %s online (inv=%s)"):format(cfg.id, invName))
+print(("craftcell %s online (inv=%s)"):format(cfg.id,
+  table.concat(invNames, "/")))
 rednet.broadcast({ type = "hello", id = cfg.id, caps = { "craft" },
-  inv = invName }, PROTOCOL)
+  inv = invName, invs = invNames }, PROTOCOL)
 
 while true do
   local sender, msg = rednet.receive(PROTOCOL)
   if type(msg) == "table" then
     if msg.type == "ping" then
       rednet.send(sender, { type = "hello", id = cfg.id, caps = { "craft" },
-        inv = invName }, PROTOCOL)
+        inv = invName, invs = invNames }, PROTOCOL)
     elseif msg.type == "job" and msg.cell == cfg.id then
       print(("job: %dx %s"):format(msg.count, msg.output))
       local ok, err = runJob(msg)

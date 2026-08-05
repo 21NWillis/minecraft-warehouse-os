@@ -144,8 +144,16 @@ local function discoverCells()
   while os.clock() < deadline do
     local _, msg = rednet.receive(PROTOCOL, 0.5)
     if type(msg) == "table" and msg.type == "hello" and msg.id and msg.inv then
-      cells[msg.id] = { id = msg.id, busy = 0, inv = msg.inv,
-        reachable = peripheral.isPresent(msg.inv) }
+      -- a cell may hold several names (several modems); use whichever
+      -- name this computer's wired network can actually reach
+      local inv, reachable = msg.inv, peripheral.isPresent(msg.inv)
+      for _, candidate in ipairs(msg.invs or {}) do
+        if peripheral.isPresent(candidate) then
+          inv, reachable = candidate, true
+          break
+        end
+      end
+      cells[msg.id] = { id = msg.id, busy = 0, inv = inv, reachable = reachable }
     end
   end
 end
