@@ -299,4 +299,11 @@ public class TerminalScreen extends Screen {
     public boolean isPauseScreen() {
         return false;
     }
+
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // no vanilla blur shader: professional software does not frost the
+        // glass. Just dim the world behind the panel.
+        g.fill(0, 0, width, height, 0x90000000);
+    }
 }
