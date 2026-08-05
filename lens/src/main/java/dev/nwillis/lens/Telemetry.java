@@ -46,6 +46,7 @@ public final class Telemetry {
             .append(",\"deferred\":").append(OrderExecutor.deferredCount())
             .append(",\"passes\":").append(OrderExecutor.passCount())
             .append(",\"lastResult\":\"").append(OrderExecutor.lastClickResult())
+            .append("\",\"lastDisarm\":\"").append(OrderExecutor.lastDisarmReason())
             .append("\",\"results\":{");
         boolean first = true;
         for (Map.Entry<String, Integer> e : OrderExecutor.resultsTally().entrySet()) {

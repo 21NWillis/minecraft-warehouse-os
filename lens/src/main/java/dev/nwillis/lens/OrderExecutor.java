@@ -99,12 +99,17 @@ public final class OrderExecutor {
         if (p != null) p.displayClientMessage(Component.literal(msg), true);
     }
 
+    private static String lastDisarm = "";
+
     private static void disarm(String why) {
         if (state != State.DISARMED) {
             state = State.DISARMED;
+            lastDisarm = why;
             say("control released (" + why + ") - " + done + "/" + total + " placed");
         }
     }
+
+    public static String lastDisarmReason() { return lastDisarm; }
 
     private static boolean humanInput(Minecraft mc) {
         return mc.options.keyUp.isDown() || mc.options.keyDown.isDown()
@@ -179,18 +184,17 @@ public final class OrderExecutor {
             return;
         }
 
-        // Hover BESIDE the target, slightly above: flight #3's placelog
-        // showed straight-overhead hovers put every click at 3.8-4.0 eye
-        // distance - the silent-miss zone. A side offset at +0.9 brings
-        // clicks to ~2.9. After a failed attempt, demand a tight approach.
-        Vec3 tc = Vec3.atCenterOf(target);
-        Vec3 away = player.position().subtract(tc).multiply(1, 0, 1);
-        away = away.lengthSqr() < 0.01 ? new Vec3(1.5, 0, 0)
-            : away.normalize().scale(1.5);
-        Vec3 hover = tc.add(away).add(0, 0.9, 0);
+        // Turtle semantics (operator-decreed after flight #4 placed zero
+        // blocks): float DIRECTLY over the cell being placed, one block
+        // up plus hitbox clearance, and click straight down. Feet at
+        // +1.15 puts the eye 2.8 from the support face - 0.7 inside the
+        // reach filter - and the tight 0.9 approach kills position slop
+        // (flight #4's side-hover left only 0.13 margin and a 2.5-block
+        // tolerance, so the face search never once succeeded).
+        Vec3 hover = Vec3.atCenterOf(target).add(0, 0.65, 0);
         Vec3 delta = hover.subtract(player.position());
         double dist = delta.length();
-        if (dist > (attempts > 0 ? 1.0 : 2.5)) {
+        if (dist > 0.9) {
             state = State.FLYING;
             double speed = Math.min(0.9, 0.25 + dist * 0.05);
             Vec3 step = delta.normalize().scale(speed);
@@ -222,15 +226,19 @@ public final class OrderExecutor {
             return;
         }
 
-        // find a solid neighbor face to click
+        // find a solid neighbor face to click; track the nearest candidate
+        // even when out of reach so failures are diagnosable from the log
         BlockHitResult hit = null;
+        double nearestFace = 99;
         for (Direction d : Direction.values()) {
             BlockPos support = target.relative(d);
             if (!mc.level.getBlockState(support).isAir()
                 && !mc.level.getBlockState(support).canBeReplaced()) {
                 Vec3 face = Vec3.atCenterOf(support)
                     .add(Vec3.atLowerCornerOf(d.getOpposite().getNormal()).scale(0.5));
-                if (player.getEyePosition().distanceTo(face) <= 3.5) {
+                double fd = player.getEyePosition().distanceTo(face);
+                nearestFace = Math.min(nearestFace, fd);
+                if (fd <= 3.5) {
                     hit = new BlockHitResult(face, d.getOpposite(), support, false);
                     break;
                 }
@@ -243,6 +251,9 @@ public final class OrderExecutor {
                 resetPlacement();
                 return;
             }
+            Telemetry.logPlace(target, null, null, nearestFace,
+                nearestFace > 90 ? "NO_SOLID_NEIGHBOR" : "NO_FACE_IN_REACH",
+                false, attempts);
             attempts = 0;
             queue.poll();
             deferred.add(next);
