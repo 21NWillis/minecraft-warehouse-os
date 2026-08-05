@@ -148,7 +148,7 @@ public final class OrderExecutor {
                 return;
             }
             passes++;
-            if (passes > 3) {
+            if (passes > 6) {
                 say("abandoning " + deferred.size()
                     + " unreachable/unsupported placements  click results: " + results);
                 results.clear();
@@ -169,11 +169,14 @@ public final class OrderExecutor {
             return;
         }
 
-        // hover point: beside-and-above the target for a clean downward click
+        // hover point: beside-and-above the target for a clean downward click.
+        // After any failed attempt, demand a tight approach - runs of blocks
+        // placed from one stale hover position put far-side clicks right at
+        // the reach limit, which is where placements start silently missing.
         Vec3 hover = Vec3.atCenterOf(target).add(0, 1.8, 0);
         Vec3 delta = hover.subtract(player.position());
         double dist = delta.length();
-        if (dist > 3.5) {
+        if (dist > (attempts > 0 ? 1.2 : 3.5)) {
             state = State.FLYING;
             double speed = Math.min(0.9, 0.25 + dist * 0.05);
             Vec3 step = delta.normalize().scale(speed);
@@ -214,11 +217,18 @@ public final class OrderExecutor {
             }
         }
         if (hit == null) {
+            // orders are support-verified, so "no reachable face" almost
+            // always means WE are badly positioned - re-approach and retry
+            if (++attempts < 6) {
+                resetPlacement();
+                return;
+            }
+            attempts = 0;
             queue.poll();
             deferred.add(next);
             resetPlacement();
             hud("§d[control]§r deferred " + target.toShortString()
-                + " (no reachable support)");
+                + " (no reachable support after retries)");
             return;
         }
 
@@ -253,13 +263,17 @@ public final class OrderExecutor {
             queue.poll();
             done++;
             attempts = 0;
-        } else if (++attempts >= 2) {
+        } else if (++attempts >= 6) {
+            // a block is a barrier: everything above it needs it placed, so
+            // giving up early turns one miss into a cascade. Six attempts
+            // with tight re-approach between each, THEN defer loudly.
             attempts = 0;
             queue.poll();
             deferred.add(next);
             hud("§d[control]§r " + target.toShortString()
-                + " rejected by server (" + lastResult + "), deferred");
+                + " rejected by server (" + lastResult + ") after retries, deferred");
         }
+        // else: stay on this block - re-approach closer and click again
     }
 
     private static void resetPlacement() {
