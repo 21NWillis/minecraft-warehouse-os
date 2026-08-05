@@ -191,7 +191,11 @@ public final class OrderExecutor {
         // reach filter - and the tight 0.9 approach kills position slop
         // (flight #4's side-hover left only 0.13 margin and a 2.5-block
         // tolerance, so the face search never once succeeded).
-        Vec3 hover = Vec3.atCenterOf(target).add(0, 0.65, 0);
+        // +0.85 not +0.65: flight #5 placed 23/23 clicks but ended by
+        // settling 0.15 onto its OWN fresh block - landing kills the MA
+        // flight augment. Feet at +1.35 keeps 0.35 clearance over a
+        // filled cell; the eye stays 2.97 from the click face.
+        Vec3 hover = Vec3.atCenterOf(target).add(0, 0.85, 0);
         Vec3 delta = hover.subtract(player.position());
         double dist = delta.length();
         if (dist > 0.9) {
@@ -201,7 +205,7 @@ public final class OrderExecutor {
             // altitude floor: flight #3 ended because the autopilot flew
             // the body into the ground and the MA flight augment cut out.
             // Never command a descent below one block over the target base.
-            if (player.getY() + step.y < target.getY() + 0.9) {
+            if (player.getY() + step.y < target.getY() + 1.2) {
                 step = new Vec3(step.x, Math.max(step.y, 0), step.z);
             }
             player.setDeltaMovement(step);
