@@ -188,19 +188,38 @@ local function runStep(step, where)
       nextJobId = nextJobId + 1
       rednet.broadcast(job, PROTOCOL)
       cell.busy = (cell.busy or 0) + 1
-      inFlight[job.jobId] = cell
+      inFlight[job.jobId] = { cell = cell, job = job, totals = totals }
       bi = bi + 1
     end
     -- await a completion
     local _, msg = rednet.receive(PROTOCOL, 30)
     if type(msg) == "table" and (msg.type == "done" or msg.type == "error")
         and inFlight[msg.job] then
-      local cell = inFlight[msg.job]
+      local entry = inFlight[msg.job]
+      local cell = entry.cell
       cell.busy = cell.busy - 1
       collect(cell.inv)
       inFlight[msg.job] = nil
       if msg.type == "error" then
-        return false, ("cell %s: %s"):format(msg.id, tostring(msg.err))
+        -- surplus = stray items aboard the cell; we just drained it, so
+        -- restage and resend the same job once before giving up
+        if tostring(msg.err):find("surplus") and not entry.retried then
+          local _, w2 = scanStorage()
+          local restaged = true
+          for item, cnt in pairs(entry.totals) do
+            if not stage(w2, item, cnt, cell.inv) then restaged = false break end
+          end
+          if restaged then
+            entry.retried = true
+            rednet.broadcast(entry.job, PROTOCOL)
+            cell.busy = cell.busy + 1
+            inFlight[msg.job] = entry
+          else
+            return false, "restage after surplus failed for " .. step.output
+          end
+        else
+          return false, ("cell %s: %s"):format(msg.id, tostring(msg.err))
+        end
       end
     elseif msg == nil and next(inFlight) then
       return false, "timed out waiting on a cell"
@@ -209,6 +228,7 @@ local function runStep(step, where)
   return true
 end
 
+-- returns ok, summary so serve mode can report to remote UIs
 local function order(count, query)
   local target
   if query:sub(1, 3) == "id:" then
@@ -218,7 +238,7 @@ local function order(count, query)
     local hits = db.search(query, 5)
     if #hits == 0 then
       print("no recipe matches: " .. query)
-      return
+      return false, "no recipe matches " .. query
     end
     target = hits[1]
   end
@@ -227,10 +247,12 @@ local function order(count, query)
   local steps, missing = planner.plan(db, have, target, count)
   if not steps then
     print("cannot craft - missing:")
+    local first
     for item, n in pairs(missing) do
       print(("  %d x %s"):format(n, item))
+      first = first or (n .. "x " .. item)
     end
-    return
+    return false, "missing " .. tostring(first)
   end
   print(("%d steps planned"):format(#steps))
   for i, step in ipairs(steps) do
@@ -238,12 +260,13 @@ local function order(count, query)
     local okStep, serr = runStep(step, where)
     if not okStep then
       printError("stopped: " .. tostring(serr))
-      return
+      return false, tostring(serr)
     end
     -- refresh the location index: outputs just landed in storage
     have, where = scanStorage()
   end
   print("order complete.")
+  return true, ("%d x %s done"):format(count, db.name(target) or target)
 end
 
 -- ------------------------------------------------------------------ main
@@ -288,6 +311,44 @@ if not cfg.storage then
 end
 
 local args = { ... }
+
+-- queue daemon: orders arrive via the local orderq file (craftui in
+-- another multishell tab) or rednet 'paperclip.order' (remote UIs, and
+-- someday the Paperclip Terminal). Submissions return instantly; the
+-- queue drains through the cells while every UI stays free.
+if args[1] == "serve" then
+  local Q = "paperclip.order"
+  print("craftd queue daemon up (file: orderq, rednet: " .. Q .. ")")
+  local queue = {}
+  while true do
+    if fs.exists("orderq") then
+      local h = fs.open("orderq", "r")
+      local text = h.readAll()
+      h.close()
+      fs.delete("orderq")
+      for line in text:gmatch("[^\n]+") do
+        local cnt, item = line:match("^(%d+)|(.+)$")
+        if item then queue[#queue + 1] = { item = item, count = tonumber(cnt) } end
+      end
+    end
+    local sender, msg = rednet.receive(Q, 1)
+    if type(msg) == "table" and msg.type == "order" and msg.item then
+      queue[#queue + 1] = { item = msg.item, count = msg.count or 1,
+        sender = sender, tag = msg.tag }
+      rednet.send(sender, { type = "queued", tag = msg.tag, depth = #queue }, Q)
+    end
+    if #queue > 0 then
+      local jobO = table.remove(queue, 1)
+      print(("[q:%d] %d x %s"):format(#queue, jobO.count, jobO.item))
+      local okO, text = order(jobO.count, "id:" .. jobO.item)
+      if jobO.sender then
+        rednet.send(jobO.sender, { type = "result", ok = okO and true or false,
+          text = tostring(text), tag = jobO.tag }, Q)
+      end
+    end
+  end
+end
+
 if #args >= 2 then
   order(tonumber(args[1]) or 1, table.concat(args, " ", 2))
   return

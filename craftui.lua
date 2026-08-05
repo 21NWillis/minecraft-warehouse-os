@@ -305,32 +305,14 @@ local function drainInput()
   end
 end
 
+-- fire-and-forget: append to the orderq file that `craftd serve`
+-- (running in another multishell tab: `bg craftd serve`) drains. The
+-- UI never blocks; queue multiple orders as fast as you can click.
 local function placeOrder(id, count, name)
-  term.setCursorBlink(false)
-  paint(colors.white, colors.black)
-  term.clear()
-  term.setCursorPos(1, 1)
-  paint(colors.yellow, colors.black)
-  print(("ordering %d x %s"):format(count, name))
-  paint(colors.white, colors.black)
-  local ok = false
-  if shell and shell.run then
-    ok = shell.run("craftd", tostring(count), craftdQuery(id)) and true or false
-  end
-  if ok then
-    message = ("ordered %d x %s"):format(count, name)
-  else
-    paint(colors.red, colors.black)
-    print("craftd not found")
-    paint(colors.lightGray, colors.black)
-    print("(deploy craftd.lua here, or check craftd.cfg)")
-    message = "craftd not found"
-  end
-  paint(colors.lightGray, colors.black)
-  print("")
-  print("press any key")
-  os.pullEvent("key")
-  drainInput()
+  local h = fs.open("orderq", fs.exists("orderq") and "a" or "w")
+  h.writeLine(count .. "|" .. id)
+  h.close()
+  message = ("queued %d x %s"):format(count, name)
 end
 
 local function orderSelected()
