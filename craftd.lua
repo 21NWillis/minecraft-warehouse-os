@@ -29,10 +29,11 @@ if fs.exists(CFG) then
   cfgFile.close()
 end
 
+-- open EVERY modem for the job channel: rednet rides wired networks
+-- too, and the cells are already on the wire - no wireless required
 for _, side in ipairs(peripheral.getNames()) do
   if peripheral.getType(side) == "modem" then
-    local m = peripheral.wrap(side)
-    if m.isWireless and m.isWireless() then rednet.open(side) end
+    rednet.open(side)
   end
 end
 

@@ -37,25 +37,21 @@ else
   return
 end
 
--- wired modem gives this turtle its name on the item network
+-- the wired modem is everything: it names this turtle on the item
+-- network AND carries the rednet job channel. No wireless needed.
 local invName
 for _, side in ipairs({ "left", "right", "top", "bottom", "front", "back" }) do
   if peripheral.getType(side) == "modem" then
     local m = peripheral.wrap(side)
     if m.isWireless and not m.isWireless() then
       invName = m.getNameLocal()
-    else
-      rednet.open(side)
     end
+    rednet.open(side)
   end
 end
 if not invName then
   print("no ACTIVE wired modem touching me - park me on the spine and")
   print("right-click the modem (red ring must be lit), then rerun")
-  return
-end
-if not rednet.isOpen() then
-  print("no wireless modem - attach one for the job channel")
   return
 end
 
