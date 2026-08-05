@@ -1,23 +1,14 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "UNU",
-    "RCR",
-    "UNU"
+    "SUS",
+    "URU",
+    "SUS"
   ],
   "key": {
-    "U": {
-      "item": "paperclip:unobtanium"
-    },
-    "N": {
-      "item": "minecraft:netherite_block"
-    },
-    "R": {
-      "item": "paperclip:gpu_rtx4"
-    },
-    "C": {
-      "item": "minecraft:nether_star"
-    }
+    "S": { "item": "paperclip:singularity_block" },
+    "U": { "item": "paperclip:unobtanium" },
+    "R": { "item": "paperclip:gpu_rtx4" }
   },
   "result": {
     "id": "paperclip:gpu_b800",

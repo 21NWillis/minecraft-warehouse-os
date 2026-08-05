@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "paperclip:block/singularity_block" }
+  }
+}

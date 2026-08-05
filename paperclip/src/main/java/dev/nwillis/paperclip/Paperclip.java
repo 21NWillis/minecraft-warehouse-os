@@ -57,6 +57,15 @@ public final class Paperclip {
     public static final DeferredHolder<Item, Item> UNOBTANIUM =
         ITEMS.register("unobtanium", () -> new Item(new Item.Properties().fireResistant()));
 
+    // 9 AE2 singularities pressed into a block: the B800's corner stones.
+    // Matter condensation as a procurement lineup - the paperclip way.
+    public static final DeferredHolder<Block, Block> SINGULARITY_BLOCK =
+        BLOCKS.register("singularity_block",
+            () -> new Block(BlockBehaviour.Properties.of().strength(50.0f, 1200.0f)));
+    public static final DeferredHolder<Item, BlockItem> SINGULARITY_BLOCK_ITEM =
+        ITEMS.register("singularity_block",
+            () -> new BlockItem(SINGULARITY_BLOCK.get(), new Item.Properties().fireResistant()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GpuBlockEntity>> GPU_BE =
         BLOCK_ENTITIES.register("gpu", () -> BlockEntityType.Builder.of(
             (pos, state) -> new GpuBlockEntity(pos, state,
