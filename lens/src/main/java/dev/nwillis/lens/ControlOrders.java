@@ -30,7 +30,7 @@ public final class ControlOrders {
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) return;
-        if (mc.level.getGameTime() - lastPoll < 100) return;   // 5s poll
+        if (mc.level.getGameTime() - lastPoll < 20) return;   // 1s poll
         lastPoll = mc.level.getGameTime();
 
         Path dir = ordersDir();
@@ -39,17 +39,23 @@ public final class ControlOrders {
             for (Path order : stream) {
                 String name = order.getFileName().toString();
                 try {
-                    BuildOrder parsed = BuildOrder.load(order);
-                    OrderExecutor.submit(parsed);
+                    com.google.gson.JsonObject root = new com.google.gson.Gson()
+                        .fromJson(Files.readString(order),
+                            com.google.gson.JsonObject.class);
+                    if (root != null && root.has("cmd")) {
+                        CommandBus.run(root);
+                    } else {
+                        OrderExecutor.submit(BuildOrder.load(order));
+                    }
                 } catch (Exception bad) {
                     mc.player.displayClientMessage(Component.literal(
-                        "§d[lens]§r build order '" + name + "' unreadable: " + bad),
+                        "§d[lens]§r order '" + name + "' unreadable: " + bad),
                         false);
                 }
                 Path seen = dir.resolve("seen");
                 Files.createDirectories(seen);
                 Files.move(order, seen.resolve(name), StandardCopyOption.REPLACE_EXISTING);
-                PaperclipLens.LOG.info("build order ingested: {}", name);
+                PaperclipLens.LOG.info("order ingested: {}", name);
             }
         } catch (IOException e) {
             PaperclipLens.LOG.warn("orders poll failed: {}", e.toString());

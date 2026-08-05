@@ -37,6 +37,7 @@ public class PaperclipLens {
         NeoForge.EVENT_BUS.addListener(OrderExecutor::onClientTick);
         NeoForge.EVENT_BUS.addListener(OrderExecutor::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(BlockBlame::onClientTick);
+        NeoForge.EVENT_BUS.addListener(Telemetry::onClientTick);
         NeoForge.EVENT_BUS.addListener(MaterialsHud::onRenderGui);
         LOG.info("Paperclip Lens up; the factory is watching back");
     }

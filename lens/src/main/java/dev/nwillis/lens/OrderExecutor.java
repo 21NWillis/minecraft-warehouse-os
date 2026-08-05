@@ -65,6 +65,10 @@ public final class OrderExecutor {
     private static int aimTicks, verifyTicks, attempts;
     private static String lastResult = "";
     private static final java.util.Map<String, Integer> results = new java.util.TreeMap<>();
+    // click details captured for the placement log
+    private static BlockPos logSupport;
+    private static Direction logFace;
+    private static double logEyeDist;
 
     public static void registerKeys(RegisterKeyMappingsEvent event) {
         armKey = new KeyMapping("key.paperclip_lens.control", GLFW.GLFW_KEY_F8,
@@ -252,12 +256,17 @@ public final class OrderExecutor {
             var result = mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
             lastResult = String.valueOf(result);
             results.merge(lastResult, 1, Integer::sum);
+            logSupport = hit.getBlockPos();
+            logFace = hit.getDirection();
+            logEyeDist = player.getEyePosition().distanceTo(hit.getLocation());
             player.swing(InteractionHand.MAIN_HAND);
         }
         // client prediction shows the block instantly; only the server's
         // answer counts, so wait out the round-trip before judging
         if (++verifyTicks < 5) return;
         boolean placed = !mc.level.getBlockState(target).isAir();
+        Telemetry.logPlace(target, logSupport, logFace, logEyeDist,
+            lastResult, placed, attempts + 1);
         resetPlacement();
         if (placed) {
             queue.poll();
@@ -298,6 +307,35 @@ public final class OrderExecutor {
     public static boolean isArmed() {
         return state != State.DISARMED;
     }
+
+    // remote control (CommandBus) - same conditions as F8, same overrides
+    public static String remoteArm() {
+        Minecraft mc = Minecraft.getInstance();
+        if (order == null || (queue.isEmpty() && deferred.isEmpty())) {
+            return "no pending build order";
+        }
+        if (mc.player == null || !mc.player.getAbilities().flying) {
+            return "refused: not flying";
+        }
+        state = State.FLYING;
+        say("control ACTIVE (remote) - any movement key releases it");
+        return "armed";
+    }
+
+    public static String remoteDisarm() {
+        disarm("remote");
+        return "disarmed";
+    }
+
+    // telemetry getters
+    public static String stateName() { return state.name(); }
+    public static int doneCount() { return done; }
+    public static int totalCount() { return total; }
+    public static int queuedCount() { return queue.size(); }
+    public static int deferredCount() { return deferred.size(); }
+    public static int passCount() { return passes; }
+    public static String lastClickResult() { return lastResult; }
+    public static java.util.Map<String, Integer> resultsTally() { return results; }
 
     /**
      * Ensure the required block item is in the selected hotbar slot.
