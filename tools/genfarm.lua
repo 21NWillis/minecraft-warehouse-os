@@ -50,23 +50,49 @@ function M.offset(fx, fy, fz)
   return fz, fy, fx
 end
 
--- one bay's order: farmland serpentine, then seeds serpentine above
+-- one bay's order: farmland first, then seeds above. The farmland layer
+-- flies at chest altitude: hover feet = target+1.35 (hoverHeight 0.85),
+-- body spans +1.35..+3.15 over the bed while the chest at center (5,5)
+-- spans +1.00..+1.875 - a 0.5-block vertical overlap, so clearance is
+-- purely horizontal: player half-width 0.3 + chest half-width 0.44 =
+-- 0.74 center-to-center minimum. Every leg here (including the
+-- half-to-arm transitions and the final climb to the seed layer) keeps
+-- >= 1.0: west half, SOUTH arm off row 9, east half rows 9->1, NORTH
+-- arm off row 1, then climb to seeds from (4,5) - moving away from the
+-- chest. A naive serpentine's diagonal transitions pass 0.49 from the
+-- chest center and clip it. The seed layer (chest altitude + hover)
+-- flies feet 0.475 above the chest lid and can serpentine plainly.
 function M.genBayOrder(k)
   local bay = M.BAYS[k]
   local px = M.bayX(k)
   local blocks = {}
-  for _, layer in ipairs({ { y = M.SLAB_Y + 1, item = bay.farmland },
-                           { y = M.SLAB_Y + 2, item = bay.seed } }) do
-    for row = 1, 9 do
-      local cols = {}
-      for c = 1, 9 do cols[#cols + 1] = (row % 2 == 1) and c or (10 - c) end
-      for _, col in ipairs(cols) do
-        if not M.WATERSET[row .. "," .. col] then
-          local fx, fy, fz = px + row, layer.y, M.Z0 + col
-          local ox, oy, oz = M.offset(fx, fy, fz)
-          blocks[#blocks + 1] = { x = ox, y = oy, z = oz, b = layer.item }
-        end
-      end
+  local function add(row, col, y, item)
+    if M.WATERSET[row .. "," .. col] then return end
+    local ox, oy, oz = M.offset(px + row, y, M.Z0 + col)
+    blocks[#blocks + 1] = { x = ox, y = oy, z = oz, b = item }
+  end
+  local fy = M.SLAB_Y + 1
+  for row = 1, 9 do                    -- west half: cols 1..4 serpentine
+    if row % 2 == 1 then
+      for col = 1, 4 do add(row, col, fy, bay.farmland) end
+    else
+      for col = 4, 1, -1 do add(row, col, fy, bay.farmland) end
+    end
+  end
+  for row = 9, 6, -1 do add(row, 5, fy, bay.farmland) end   -- south arm
+  for row = 9, 1, -1 do                -- east half: rows 9->1, cols 6..9
+    if row % 2 == 1 then
+      for col = 6, 9 do add(row, col, fy, bay.farmland) end
+    else
+      for col = 9, 6, -1 do add(row, col, fy, bay.farmland) end
+    end
+  end
+  for row = 1, 4 do add(row, 5, fy, bay.farmland) end   -- north arm
+  for row = 1, 9 do                    -- seeds: plain serpentine, clears chest
+    if row % 2 == 1 then
+      for col = 1, 9 do add(row, col, M.SLAB_Y + 2, bay.seed) end
+    else
+      for col = 9, 1, -1 do add(row, col, M.SLAB_Y + 2, bay.seed) end
     end
   end
   return blocks
