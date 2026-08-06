@@ -136,6 +136,43 @@ free GPU shrine (a B800 on a pedestal, purely to flex).
   ceiling, stubs every 8 blocks. Lay cable FIRST, modems after,
   netprobe before declaring anything done (the doctrine).
 
+## SHARD 1 — LIVE (order staged 2026-08-05)
+
+The first deck tile, sited from the 08-05 snapshot (under-campus is
+verified empty air y=261..267, zero obstructions). 32x16 obsidian at
+y=257 (walk surface 258), directly under the storage/craftd hub so the
+cable spine is a straight 11-block drop.
+
+- World rect: x -376..-345, z -1872..-1857, block layer y=257.
+- Order file: shard1_deck.json (512 obsidian, serpentine, fully
+  adjacency-chained - verified offline, 0 non-adjacent transitions).
+- ANCHOR: hand-place ONE obsidian at world (-376, 257, -1872) - the
+  NW corner - before arming. Floating tile: every other block chains
+  sideways off it (executor face search tries all six directions).
+- Spine: break one campus floor block near the hub (storage cluster
+  x -369..-359, z -1869..-1861), cable column straight down to deck
+  ceiling, wired modem stubs at the bottom. Cable = stone + redstone
+  (6/craft), wired modem = 8 stone + redstone - smelt ~2 stacks
+  cobble to stone first, everything else is grid work.
+- Machine row 1 (hand-placed, GUI-block doctrine): pitiful generator
+  + metallurgic infuser near the spine foot, ~(-368, 258, -1866).
+
+First-power path (recipe-db verified, planner-simulated 08-05):
+NO copper needed. industrialforegoing:pitiful_generator = cobble +
+gold ingot + 2 iron bars + furnace + machine_frame_pity (4 logs +
+4 iron + redstone block). Every input is logs/cobble/essence. Burns
+wood or coal, outputs RF; pipez energy pipe (or adjacency) feeds the
+metallurgic infuser -> infused alloy -> circuits -> the whole tree.
+Planner dry-run resolves it as a 9-step, 3-level recursive plan; the
+infuser as 5 steps; obsidian 1:1 from essence (8 -> 8).
+
+Recursive showcase orders (exact-id, via craftui or orderq):
+  256|id:minecraft:obsidian            (x2 - deck material, keeps
+                                        each cell job under the 64-run
+                                        / free-slot ceiling)
+  1|id:industrialforegoing:pitiful_generator
+  1|id:mekanism:metallurgic_infuser
+
 ## Bootstrap order for the long session
 
 1. P0 bays (copper/lapis) - flights + your ritual, ~1 hour
