@@ -29,6 +29,15 @@ verify -> re-index -> integrate -> then play.
       sail (3 copper + 2 lapis + 4 panes), pitiful_generator chain,
       metallurgic infuser chain, gas-burning generator chain. Any
       drift invalidates datacenter_floor.md numbers - fix there.
+- [ ] Re-run the EMC fixpoint after the recipe re-index - recipe
+      churn reprices everything and the Exchange must not lie.
+- [ ] Pantry-audit JEI checks (planning/pantry_audit.md): digital
+      miner, createaddition alternator, IF laser drill lenses,
+      modular router modules, cyclic disenchanter/uncrafter,
+      Charging Gadgets turtle support.
+- [ ] If AP slipped from the update: the SFM redstone bridge is the
+      CC<->ME fallback (CC sets a redstone level, SFM program gated
+      on it moves items between an ME Interface and a CC chest).
 
 ## Step 2 — craftd goes ME-native (the pre-armed push)
 
