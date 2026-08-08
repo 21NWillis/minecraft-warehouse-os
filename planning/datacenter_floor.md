@@ -117,7 +117,9 @@ Under-campus deck, in rows (leave turtle aisles, 2-wide, marked):
 
 ## Phase P4 — the long-term open face
 
-The deck extends west as demand appears: more cell racks, ME annex
+The deck extends EAST as demand appears (east is the designated
+long-span corridor; west is banned by compass law - an earlier draft
+of this section said west and was wrong): more cell racks, ME annex
 (sovereign controller when meteorite trip happens), aeronautics dock
 (Ship One moors at deck edge - it needs open sky too), accelerator-
 free GPU shrine (a B800 on a pedestal, purely to flex).
@@ -177,7 +179,8 @@ Recursive showcase orders (exact-id, via craftui or orderq):
 
 1. P0 bays (copper/lapis) - flights + your ritual, ~1 hour
 2. Deck tile 1 (32x16 under SW campus) + spine trunk - turtles
-3. P1 wind farm on first sun-wing mast row - immediate power
+3. P1 solar row + ethylene line on the sun wing - immediate power
+   (wind is DELETED from the pack; this line once said wind farm)
 4. Mekanism ore line row 1 (infuser -> enrichment -> smelter)
 5. P2 gun row 1 (12 guns) once sails flow
 6. Iterate: more tiles, more rows, more guns, fission when bored
