@@ -1,6 +1,7 @@
 package dev.nwillis.lens;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -26,6 +27,29 @@ public final class ClientCommands {
             .executes(ctx -> corner(ctx.getSource(), false)));
         d.register(Commands.literal("datum")
             .executes(ctx -> datum(ctx.getSource())));
+        // /fieldsnap [radius] [down] [up] - one-shot site inspection
+        // around the player; never touches the campus model or config
+        d.register(Commands.literal("fieldsnap")
+            .executes(ctx -> fieldsnap(ctx.getSource(), 48, 32, 16))
+            .then(Commands.argument("radius", IntegerArgumentType.integer(4, 128))
+                .executes(ctx -> fieldsnap(ctx.getSource(),
+                    IntegerArgumentType.getInteger(ctx, "radius"), 32, 16))
+                .then(Commands.argument("down", IntegerArgumentType.integer(0, 128))
+                    .executes(ctx -> fieldsnap(ctx.getSource(),
+                        IntegerArgumentType.getInteger(ctx, "radius"),
+                        IntegerArgumentType.getInteger(ctx, "down"), 16))
+                    .then(Commands.argument("up", IntegerArgumentType.integer(0, 128))
+                        .executes(ctx -> fieldsnap(ctx.getSource(),
+                            IntegerArgumentType.getInteger(ctx, "radius"),
+                            IntegerArgumentType.getInteger(ctx, "down"),
+                            IntegerArgumentType.getInteger(ctx, "up")))))));
+    }
+
+    private static int fieldsnap(CommandSourceStack src, int r, int down, int up) {
+        BlockPos p = BlockPos.containing(src.getPosition());
+        String status = FieldSnap.start(p, r, down, up);
+        src.sendSuccess(() -> Component.literal(status), false);
+        return 1;
     }
 
     private static int corner(CommandSourceStack src, boolean minCorner) {

@@ -33,6 +33,7 @@ public class PaperclipLens {
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onClientTick);
         NeoForge.EVENT_BUS.addListener(TurtleEsp::onRenderLevel);
         NeoForge.EVENT_BUS.addListener(WorldModel::onClientTick);
+        NeoForge.EVENT_BUS.addListener(FieldSnap::onClientTick);
         NeoForge.EVENT_BUS.addListener(ControlOrders::onClientTick);
         NeoForge.EVENT_BUS.addListener(OrderExecutor::onClientTick);
         NeoForge.EVENT_BUS.addListener(OrderExecutor::onRenderLevel);
