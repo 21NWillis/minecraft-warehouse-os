@@ -83,9 +83,15 @@ if dryRun then
   return
 end
 if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < estMoves then
+  -- COAL-ONLY: blanket refuel() eats wooden chests and anything else
+  -- combustible aboard (QUIRKS law; printfit learned this the hard way)
   for slot = 1, 16 do
-    turtle.select(slot)
-    if turtle.refuel(0) then turtle.refuel() end
+    local d = turtle.getItemDetail(slot)
+    if d and (d.name == "minecraft:coal" or d.name == "minecraft:charcoal"
+        or d.name == "minecraft:coal_block") then
+      turtle.select(slot)
+      turtle.refuel()
+    end
   end
   print(("fuel: %s (est need %d)"):format(tostring(turtle.getFuelLevel()), estMoves))
   if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < estMoves then

@@ -508,13 +508,17 @@ public final class OrderExecutor {
                 return 2;
             }
         }
-        // in the backpack rows? swap it into the selected hotbar slot
+        // in the backpack rows? swap it into the selected hotbar slot.
+        // InventoryMenu maps backpack rows 9..35 to container slots
+        // 9..35 IDENTICALLY (hotbar is 36..44). The old formula here
+        // rotated them - undetected because uniform-material flights
+        // grab the right item from the wrong slot. (Outside review
+        // catch: Kimi K3, 2026-08-08.)
         for (int slot = 9; slot < 36; slot++) {
             if (matches(inv.getItem(slot), want)) {
                 mc.gameMode.handleInventoryMouseClick(
                     player.inventoryMenu.containerId,
-                    slot < 27 ? slot + 9 : slot - 27,   // container slot mapping
-                    inv.selected, ClickType.SWAP, player);
+                    slot, inv.selected, ClickType.SWAP, player);
                 return matches(inv.getSelected(), want) ? 2 : 0;
             }
         }

@@ -159,8 +159,13 @@ function q.run(ops, opts)
   local function bail(reason, layer, cell)
     st.stopped = reason
     st.at = { layer = layer, cell = cell }
-    goHome(ops, pose)
-    if ops.dumpHome then ops.dumpHome() end
+    -- only unload if we actually made it home: a blocked bail that
+    -- dumps mid-field scatters the keepers (outside-review catch)
+    if goHome(ops, pose) then
+      if ops.dumpHome then ops.dumpHome() end
+    else
+      st.stranded = true
+    end
     st.pose = pose
     return st
   end
@@ -201,8 +206,11 @@ function q.run(ops, opts)
       if opts.onProgress then opts.onProgress(layer, i, #cells) end
     end
   end
-  goHome(ops, pose)
-  ops.dumpHome()
+  if goHome(ops, pose) then
+    ops.dumpHome()
+  else
+    st.stranded = true
+  end
   st.pose = pose
   return st
 end

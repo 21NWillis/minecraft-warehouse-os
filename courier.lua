@@ -138,6 +138,9 @@ end
 print("courier online: casino barrels -> warehouse inputs, every " .. ROUND_SLEEP .. "s")
 while true do
   local ok, err = pcall(round)
-  if not ok then print("round error: " .. tostring(err)) end
+  if not ok then
+    if tostring(err):find("Terminated") then error(err, 0) end -- Ctrl+T must kill us
+    print("round error: " .. tostring(err))
+  end
   sleep(ROUND_SLEEP)
 end

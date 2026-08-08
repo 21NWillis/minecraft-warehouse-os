@@ -169,18 +169,35 @@ local function stage(where, item, count, targetName)
 end
 
 -- drain a cell turtle back into storage (also used pre-stage so the
--- cell always starts a job empty)
+-- cell always starts a job empty). Hardened per outside review:
+-- peripheral list hoisted (was rebuilt 16x per drain), every push
+-- pcall'd (a split network must not kill the daemon), and the count
+-- of items stranded aboard is RETURNED - "order complete" while
+-- results sit in a cell is a lie we no longer tell.
 local function collect(invName)
   local out = peripheral.wrap(invName)
-  if not (out and out.list) then return end
-  for slot in pairs(out.list()) do
-    for _, s in ipairs(storagePeripherals()) do
+  if not (out and out.list) then return 0 end
+  local okL, listing = pcall(out.list)
+  if not (okL and listing) then return 0 end
+  local stores = storagePeripherals()
+  for slot in pairs(listing) do
+    for _, s in ipairs(stores) do
       if not s.pullOnly then
-        while out.pushItems(s.name, slot) > 0 do end
-        if not out.list()[slot] then break end
+        while true do
+          local okP, moved = pcall(out.pushItems, s.name, slot)
+          if not okP or not moved or moved == 0 then break end
+        end
+        local okD, d = pcall(out.getItemDetail, slot)
+        if okD and not d then break end   -- slot empty, next slot
       end
     end
   end
+  local leftover = 0
+  local okA, after = pcall(out.list)
+  if okA and after then
+    for _, item in pairs(after) do leftover = leftover + item.count end
+  end
+  return leftover
 end
 
 -- ------------------------------------------------------------------ cells
@@ -211,6 +228,15 @@ local function runStep(step, where)
   local batches = hub.batchSizes(step.times)
   local inFlight = {}
   local bi = 1
+  -- every abort path MUST release busy counts, or the cells involved
+  -- are excluded from pickCell until the daemon restarts (leak found
+  -- by outside review)
+  local function abort(why)
+    for _, entry in pairs(inFlight) do
+      entry.cell.busy = math.max(0, (entry.cell.busy or 1) - 1)
+    end
+    return false, why
+  end
   while bi <= #batches or next(inFlight) do
     -- dispatch to every idle cell
     while bi <= #batches do
@@ -227,7 +253,8 @@ local function runStep(step, where)
         end
       end
       if not staged then
-        return false, "storage ran short staging " .. step.output
+        collect(cell.inv)   -- return the partial stage to storage
+        return abort("storage ran short staging " .. step.output)
       end
       local job = hub.jobFor(step, batch)
       job.type, job.cell, job.jobId = "job", cell.id, nextJobId
@@ -244,7 +271,11 @@ local function runStep(step, where)
       local entry = inFlight[msg.job]
       local cell = entry.cell
       cell.busy = cell.busy - 1
-      collect(cell.inv)
+      local stranded = collect(cell.inv)
+      if stranded > 0 then
+        printError(("WARNING: %d item(s) stranded aboard %s - storage full?")
+          :format(stranded, cell.id))
+      end
       inFlight[msg.job] = nil
       if msg.type == "error" then
         -- surplus = stray items aboard the cell; we just drained it, so
@@ -261,14 +292,14 @@ local function runStep(step, where)
             cell.busy = cell.busy + 1
             inFlight[msg.job] = entry
           else
-            return false, "restage after surplus failed for " .. step.output
+            return abort("restage after surplus failed for " .. step.output)
           end
         else
-          return false, ("cell %s: %s"):format(msg.id, tostring(msg.err))
+          return abort(("cell %s: %s"):format(msg.id, tostring(msg.err)))
         end
       end
     elseif msg == nil and next(inFlight) then
-      return false, "timed out waiting on a cell"
+      return abort("timed out waiting on a cell")
     end
   end
   return true
@@ -380,6 +411,7 @@ if args[1] == "serve" then
   print("craftd queue daemon up (orderq file, rednet " .. Q .. ", terminals)")
   local queue = {}
   local lastCatalog = 0
+  local lastDiscover = 0
 
   local function terminals()
     return { peripheral.find("paperclip_terminal") }
@@ -497,13 +529,23 @@ if args[1] == "serve" then
       pushCatalog()
       pushQueue(nil)
     end
+    -- nursery-grown cells announce on ping: re-discover every ~30s so
+    -- fleet growth is actually zero-config (only while idle - discovery
+    -- pumps the craft protocol and could eat order traffic mid-job)
+    if #queue == 0 and os.clock() - (lastDiscover or 0) > 30 then
+      lastDiscover = os.clock()
+      discoverCells()
+    end
     -- drain one order
     if #queue > 0 then
       local jobO = table.remove(queue, 1)
       local label = jobO.count .. " x " .. (db.name(jobO.item) or jobO.item)
       print(("[q:%d] %s"):format(#queue, label))
       pushQueue(label)
-      local okO, text = order(jobO.count, "id:" .. jobO.item)
+      -- pcall: one peripheral throw inside an order must not kill the
+      -- daemon (a bad cable day is survivable; a dead storefront isn't)
+      local okCall, okO, text = pcall(order, jobO.count, "id:" .. jobO.item)
+      if not okCall then okO, text = false, "internal: " .. tostring(okO) end
       toastAll(okO and label or (label .. ": " .. tostring(text)), okO)
       chatSay((okO and "done: " or "FAILED: ") .. label)
       if jobO.sender then
