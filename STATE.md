@@ -20,6 +20,12 @@ disagree, this file wins and the planning doc is stale.
   Dyson battery and an airship confirmed in the census.
 - 2026-08-08: clutch pedal hotline operational (voice in, Ava out);
   operator can talk to the Board hands-free from any game.
+- 2026-08-08: **SHARD 1 FLOWN** — the first deck tile (32x16
+  obsidian, 512 blocks, under the storage hub) built by F8 while the
+  operator sat in a VC, muted, pedal-talking to the Board. The
+  Datacenter Floor campaign is physically begun; the Carpet has its
+  first tile. Next per plan: cable spine drop, pitiful generator +
+  metallurgic infuser at the spine foot.
 - 2026-08-08: **5 ae2:singularities minted** — 5/9 toward the
   Ninefold block (the B800 cornerstone). The Condenser has spoken
   five times.
