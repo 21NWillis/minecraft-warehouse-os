@@ -190,5 +190,45 @@ do
   print(("      (tower: %d blocks, %d turtle moves)"):format(s:count(), mock.moves))
 end
 
+-- ADJUDICATED 2026-08-08 (two outside reviews, unanimous): binary-search
+-- resume must NEVER conclude completion from probes alone. World state can
+-- violate the strict-prefix assumption (matching blocks beyond the stop
+-- point make every probe read "placed" and the search overshoot the hole).
+-- The fix: "probes say done" falls back to a full in-order verification
+-- pass. This is the minimal counterexample from the adjudication.
+do
+  local plan = {
+    { x = 0, y = 0, z = 0, block = "minecraft:stone" },
+    { x = 1, y = 0, z = 0, block = "minecraft:stone" },
+    { x = 2, y = 0, z = 0, block = "minecraft:stone" },
+    { x = 3, y = 0, z = 0, block = "minecraft:stone" },
+  }
+  local mock = newMock({ ["minecraft:stone"] = 5 })
+  mock.ops.checkDown = function(block)
+    return mock.world[mock.key(mock.x, mock.y - 1, mock.z)] == block
+  end
+  -- world: index 1 placed, index 2 MISSING, indices 3-4 pre-existing
+  -- (non-monotonic predicate: probes at 3 and 4 both read "placed")
+  mock.world[mock.key(0, 0, 0)] = "minecraft:stone"
+  mock.world[mock.key(2, 0, 0)] = "minecraft:stone"
+  mock.world[mock.key(3, 0, 0)] = "minecraft:stone"
+  local pose = { x = 0, y = 1, z = 0, f = 0 }
+  local placed, err = builder.resume(plan, mock.ops, nil, pose)
+  check("overshoot resume does not falsely report done", err == nil, err)
+  check("overshoot resume fills the buried hole",
+    mock.world[mock.key(1, 0, 0)] == "minecraft:stone",
+    "index 2 cell still empty")
+end
+
+-- pose must travel with resume errors: a caller persisting the park file
+-- would otherwise trust a stale pose while the turtle physically moved
+do
+  local plan = { { x = 0, y = 0, z = 0, block = "minecraft:stone" } }
+  local mock = newMock({})
+  local pose = { x = 0, y = 1, z = 0, f = 0 }
+  local placed, err, epose = builder.resume(plan, mock.ops, nil, pose)
+  check("resume without checkDown errors WITH a pose",
+    err ~= nil and epose ~= nil, tostring(err) .. " pose=" .. tostring(epose))
+end
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end

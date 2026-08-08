@@ -103,13 +103,19 @@ function builder.run(plan, ops, onProgress, resume_)
 end
 
 -- Resume a partial build from a KNOWN pose (persisted at park time, or the
--- datum-frame pose a wrapper like datacenter tracks). Placements are always a
--- strict prefix of the plan, so the first missing block is found by binary
--- search with fly-over probes (~12 probes for a 4000-block plan), then the
--- remainder runs normally with checkDown making revisits idempotent.
--- Requires ops.checkDown. Returns like builder.run.
+-- datum-frame pose a wrapper like datacenter tracks). Binary search finds a
+-- CANDIDATE first-missing entry fast (~12 fly-over probes for 4000 blocks)
+-- under the strict-prefix ASSUMPTION - true for an undisturbed own-run
+-- interruption, but the world can violate it (pre-existing matching blocks
+-- beyond the stop point, creeper holes behind it, another builder's work).
+-- So the search NEVER concludes completion: if the probes say "all placed",
+-- we fall back to a full in-order verification pass (run() with checkDown
+-- skips - the robust algorithm) instead of reporting done off ~12 samples.
+-- Adjudicated 2026-08-08: two independent reviews ruled the old "probes say
+-- done -> done" path could silently bury missing blocks and delete the park
+-- file. Requires ops.checkDown. Returns like builder.run.
 function builder.resume(plan, ops, onProgress, pose)
-  if not ops.checkDown then return 0, "resume requires ops.checkDown" end
+  if not ops.checkDown then return 0, "resume requires ops.checkDown", pose end
   local maxY = 0
   for _, p in ipairs(plan) do if p.y > maxY then maxY = p.y end end
   local function lift()
@@ -119,7 +125,11 @@ function builder.resume(plan, ops, onProgress, pose)
     end
     return true
   end
-  if not lift() then return 0, "cannot reach flight level above the build" end
+  if not lift() then
+    -- pose MUST travel with every error: the turtle has physically moved,
+    -- and a caller persisting a stale park pose desyncs the next resume
+    return 0, "cannot reach flight level above the build", pose
+  end
   local function placedAt(i)
     local p = plan[i]
     if not moveTo(ops, pose, p.x, math.max(pose.y, maxY + 2), p.z) then return nil end
@@ -138,13 +148,17 @@ function builder.resume(plan, ops, onProgress, pose)
   while lo < hi do
     local mid = math.floor((lo + hi) / 2)
     local placed = placedAt(mid)
-    if placed == nil then return 0, "probe blocked - airspace above the build must be clear" end
+    if placed == nil then
+      return 0, "probe blocked - airspace above the build must be clear", pose
+    end
     if placed then lo = mid + 1 else hi = mid end
   end
-  if lo > #plan then                 -- nothing missing; just park
-    moveTo(ops, pose, 0, maxY + 2, 0)
-    while pose.y > 0 and ops.down() do pose.y = pose.y - 1 end
-    return #plan, nil, pose
+  if lo > #plan then
+    -- the probes found nothing missing - but ~12 samples cannot prove a
+    -- 4000-block build complete (matching tail blocks the run never placed
+    -- make the search overshoot). Verify with the full in-order pass:
+    -- checkDown skips everything genuinely placed, fills any holes.
+    return builder.run(plan, ops, onProgress, { pose = pose, from = 1 })
   end
   -- align over the first missing block's column, then continue the plan;
   -- run()'s vertical-first descent there is clear (nothing above a prefix end)
