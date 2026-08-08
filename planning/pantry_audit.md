@@ -19,11 +19,17 @@ planning + the fleet; update that paragraph.
 
 And the theological kicker: the Matter Condenser — the machine in our
 founding myth, the thing that makes `ae2:singularity`, the relic the
-B800's cornerstone needs nine of — **is an AE2 machine. The
-corporation's god is gated behind the one giant it's sleeping on.**
-Stage 1 (ad-hoc: storage bus on the collector chest, crafting
-terminal) is LIVE (31 mending books in residence); stage 2 (controller,
-pattern terminal, Ex Assemblers) is the sleeping half.
+B800's cornerstone needs nine of — **is an AE2 machine.**
+
+> **OPERATOR CORRECTION (2026-08-08): the ME system is FULLY LIVE and
+> always-on — daily-driven storage across the main base (31 mending
+> books in residence). The planning docs' "phase 7 staged" framing is
+> STALE; the base outran its own paperwork.** What remains unverified
+> in-game (check, don't assume): pattern-based autocrafting + Ex
+> Molecular Assemblers, ae2jeiintegration pattern transfer in use,
+> ae2wtlib wireless terminal + infinity booster, AppliedFlux power
+> backbone. Whatever's missing from that list is the actual sleeping
+> fraction of giant #1.
 
 ## Sleeping giants, ranked
 
