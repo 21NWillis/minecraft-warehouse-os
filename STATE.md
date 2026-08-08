@@ -20,6 +20,9 @@ disagree, this file wins and the planning doc is stale.
   Dyson battery and an airship confirmed in the census.
 - 2026-08-08: clutch pedal hotline operational (voice in, Ava out);
   operator can talk to the Board hands-free from any game.
+- 2026-08-08: **5 ae2:singularities minted** — 5/9 toward the
+  Ninefold block (the B800 cornerstone). The Condenser has spoken
+  five times.
 - 2026-08-08: ~31 mending books banked in ME (casino KEEP pile).
 - 2026-08-08: treasury note - wealth held in essence, not diamonds;
   earlier 8-digit diamond estimate was wrong.
