@@ -8,7 +8,7 @@
 --
 --   bridge run        -- fetch a Lua command file Claude committed to the repo
 --                        (bridge_commands.lua), run it against the world in a
---                        sandboxed pcall, capture its output, upload it, print a
+--                        plain pcall (NOT a sandbox - it can touch anything), capture its output, upload it, print a
 --                        code. Claude now ACTS on the world and reads the result.
 --
 -- The loop: you relay two short codes, Claude operates the base between them.

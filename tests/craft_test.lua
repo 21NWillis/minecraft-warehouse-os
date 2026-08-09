@@ -255,23 +255,19 @@ check("arrange(e): full 3x3 grid planned", tE ~= nil)
 check("arrange(e): all nine positions filled, spare slots empty",
   arrangeErr(invE, gridE, 3) == nil, arrangeErr(invE, gridE, 3))
 
--- --- KNOWN BUG 1 (crafthub.arrangePlan): a grid destination that holds
--- MORE than the batch needs is pushed onto `clears`, and craftcell
--- clears by select+dropDown, which empties the whole slot - taking the
--- ingredients the grid just kept with it. Surplus must be trimmed
--- (partial drop, or moved to a spare slot), never dropped wholesale.
--- The check below states the CORRECT behavior; it fails today.
+-- --- REGRESSION (was BUG 1, FIXED by the evict-then-fill rewrite):
+-- a grid destination holding MORE than the batch needs used to be
+-- dumped wholesale via `clears`. Surplus is now trimmed to spare
+-- slots. This check pins the fix.
 local invF = { [1] = { name = PLANK, count = 64 } }
 check("arrange: surplus inside a grid slot is trimmed, not dumped [BUG 1]",
   arrangeErr(invF, { [1] = PLANK }, 10) == nil,
   arrangeErr(invF, { [1] = PLANK }, 10))
 
--- --- KNOWN BUG 2 (crafthub.arrangePlan): transfers are emitted in grid
--- order with no regard for destinations that are still occupied by a
--- foreign item. turtle.transferTo refuses such a move, so the grid is
--- silently left wrong and turtle.craft fails. Two ingredients that need
--- to swap slots deadlock: whichever transfer runs first is blocked.
--- The check below states the CORRECT behavior; it fails today.
+-- --- REGRESSION (was BUG 2, FIXED by phase-A eviction): transfers
+-- into occupied destinations used to deadlock (transferTo refuses a
+-- move into a foreign item; swaps blocked whichever ran first).
+-- Eviction to scratch slots breaks the cycles. This check pins it.
 local invG = { [1] = { name = PLANK, count = 10 }, [2] = { name = STICK, count = 10 } }
 check("arrange: swapping two occupied grid slots still works [BUG 2]",
   arrangeErr(invG, { [1] = STICK, [2] = PLANK }, 10) == nil,

@@ -17,6 +17,7 @@
 --   craftd <count> <search...>   one order, then exit
 local db = require("recipedb")
 local planner = require("planner")
+local plancache = require("plancache")
 local hub = require("crafthub")
 
 local PROTOCOL = "paperclip.craft"
@@ -43,6 +44,11 @@ if not ok then
   printError("recipedb: " .. tostring(err))
   return
 end
+-- memoized DAG planner (outside audit: craftd ran the slow full-
+-- backtracking planner while plancache sat next door; steps schemas
+-- are identical - crafthub reads only picks/output). planner.lua
+-- stays as the fallback if a resolve throws.
+local pcache = plancache.new(db)
 
 -- ---------------------------------------------------------------- storage
 local cells = {}   -- filled by discoverCells; needed to exclude cell invs
@@ -322,7 +328,17 @@ local function order(count, query)
   end
   print(("order: %d x %s"):format(count, db.name(target) or target))
   local have, where = scanStorage()
-  local steps, missing = planner.plan(db, have, target, count)
+  -- plan against a COPY: the quantity pass consumes stock as it walks
+  local haveCopy = {}
+  for k, v in pairs(have) do haveCopy[k] = v end
+  local okP, steps, missing = pcall(function()
+    local s, m = pcache:plan(target, count, haveCopy)
+    return s, m
+  end)
+  if not okP then
+    printError("plancache: " .. tostring(steps) .. " - falling back")
+    steps, missing = planner.plan(db, have, target, count)
+  end
   if not steps then
     -- our cells can't make it; can AE2's crafting CPUs? (patterned
     -- recipes forwarded via the ME Bridge, fire-and-forget)

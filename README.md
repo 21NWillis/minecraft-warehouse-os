@@ -75,8 +75,14 @@ Boot `menu` for the launcher. Deploy with `update` (below).
 - `update.lua` — pull everything in `manifest.txt` from the repo's raw URLs.
 - `report.lua` — upload program output to pastebin. `seed.lua` — one-trip bootstrap.
 - `tests/` — headless suites run with `lua54` (12 suites, all green).
-- `datacenter/` (a.k.a. **Paperclip**) — optional Java mod: item-delivery + GPU
-  peripherals (GT-1/RTX-4/B800) + cluster primitives. Not required by any Lua above.
+- `paperclip/` — the **Paperclip** Java mod: item-delivery + GPU peripherals
+  (GT-1/RTX-4/B800) + cluster primitives. Ships server-side in the pack as of
+  v1.0.3 ("The Uhhhh That What").
+- `terminal/` — **paperclipos**, the Paperclip Terminal mod (order UI, toasts,
+  catalog). Also server-canon as of v1.0.3.
+- `lens/` — **paperclip-lens**, the client-only QoL mod: world journal +
+  snapshots, F8 build executor, materials HUD, block blame, /fieldsnap.
+  Personal install, not in the pack.
 
 ## Deploying in-game
 
