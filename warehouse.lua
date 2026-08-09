@@ -196,17 +196,24 @@ local function withdraw(id, want)
   return moved
 end
 
+-- PULL-ONLY LAW (three audits flagged this): deposits route to
+-- insertable network storage via storagelib, NEVER into the
+-- controller (inserts void once matching stacks cap - the famine)
+local storagelib = require("storagelib")
+local function insertStores()
+  return storagelib.discover({ exclude = { [deliveryName or ""] = true,
+    [controllerName] = true } })
+end
+
 local function deposit()
   if not deliveryName then return 0 end
   local chest = peripheral.wrap(deliveryName)
-  local moved, tasks = 0, {}
-  for slot in pairs(chest.list()) do
-    tasks[#tasks + 1] = function()
-      moved = moved + timed("push", chest.pushItems, controllerName, slot)
-    end
-  end
-  if #tasks > 0 then parallel.waitForAll(table.unpack(tasks)) end
-  return moved
+  local before = 0
+  for _, it in pairs(chest.list()) do before = before + it.count end
+  if before == 0 then return 0 end
+  local left, why = storagelib.drain(chest, insertStores())
+  if why then printError("deposit: " .. why) end
+  return before - left
 end
 
 -- turtle 4x4 inventory slots that form the 3x3 crafting grid
@@ -236,11 +243,11 @@ local function loadBatch(crafterName, step, batch)
 end
 
 local function unloadTurtle(crafterName)
-  local tasks = {}
-  for t = 1, 16 do
-    tasks[#tasks + 1] = function() timed("push", controller.pullItems, crafterName, t) end
-  end
-  parallel.waitForAll(table.unpack(tasks))
+  -- pull-only law: results land in insertable storage, not the
+  -- controller (which voids inserts). storagelib excludes it.
+  local slots = {}
+  for t = 1, 16 do slots[t] = t end
+  storagelib.pullFrom(insertStores(), crafterName, slots)
 end
 
 -- a turtle.craft of <=64 is instant and the rednet round-trip is sub-second,

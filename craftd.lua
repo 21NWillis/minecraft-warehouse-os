@@ -61,9 +61,10 @@ local function chatBox()
   return peripheral.find("chatBox")
 end
 
+local voice = require("voice")
 local function chatSay(msg)
-  local cb = chatBox()
-  if cb then pcall(cb.sendMessage, msg, "PaperclipOS") end
+  -- the corporate voice: department-bracketed, sanitized, filed
+  voice.say(chatBox(), "PAYROLL", msg)
 end
 
 -- Controllers are PULL-ONLY: reading and extracting from the SS

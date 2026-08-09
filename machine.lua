@@ -19,12 +19,17 @@ function machine.plan(inCount, outCount, cfg)
 end
 
 if not _TEST then
+  local storagelib = require("storagelib")
   local controllerName
   for _, n in ipairs(peripheral.getNames()) do
     if n:find("controller", 1, true) then controllerName = n break end
   end
   if not controllerName then error("no storage controller on the network") end
   local controller = peripheral.wrap(controllerName)
+  -- insertable return targets (pull-only law: the controller voids
+  -- inserts; drains go to real inventories the controller can see).
+  -- Assigned after stations parse: machines must never be targets.
+  local machineStores
 
   local stations = {}
   if fs.exists("machines.cfg") then
@@ -47,6 +52,9 @@ if not _TEST then
     print("format: <peripheralName> <inSlot> <outSlot> <item> [target]")
     return
   end
+  local exclude = {}
+  for _, st in ipairs(stations) do exclude[st.name] = true end
+  machineStores = storagelib.discover({ exclude = exclude })
 
   -- source slots for an item in the controller
   local function sourceSlots(item)
@@ -67,7 +75,10 @@ if not _TEST then
         local inCount = inItem and inItem.count or 0
         local outCount = outItem and outItem.count or 0
         local act = machine.plan(inCount, outCount, st)
-        if act.drain then pcall(m.pushItems, controllerName, st.outSlot) end
+        -- pull-only law: drain to insertable storage, never the controller
+        if act.drain then
+          pcall(storagelib.pushFirstFit, m, st.outSlot, machineStores)
+        end
         if act.feed > 0 then
           local remaining = act.feed
           for _, s in ipairs(sourceSlots(st.item)) do

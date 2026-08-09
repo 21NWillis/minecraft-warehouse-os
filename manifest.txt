@@ -72,6 +72,8 @@ printfit.lua
 enchantfit.lua
 crafthub.lua
 craftcell.lua
+storagelib.lua
+voice.lua
 craftd.lua
 gunfit.lua
 craftui.lua
