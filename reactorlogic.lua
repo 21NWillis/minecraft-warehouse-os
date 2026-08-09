@@ -30,13 +30,34 @@ function rlogic.normalize(raw)
     coolant = frac(raw.coolant), heated = frac(raw.heated),
     fuel = frac(raw.fuel), waste = frac(raw.waste),
     actual = raw.actual, maxBurn = raw.maxBurn,
-    running = raw.running or false,
+    -- tri-state on purpose: true/false/UNKNOWN. Coercing unknown to
+    -- false made a dead getStatus indistinguishable from a cold core,
+    -- which defeated the blind-while-burning guard (fail-closed law).
+    running = raw.running,
   }
 end
 
+-- safety-critical readings: CONTROL requires all of them. (fuel/actual/
+-- maxBurn are operational, not safety - their absence degrades, not trips.)
+rlogic.SAFETY = { "temp", "damage", "coolant", "heated", "waste" }
+
+-- which safety readings are missing? nil if the picture is complete.
+-- FAIL-CLOSED (outside audit, adopted): a monitor may tolerate blindness;
+-- a controller driving a live reactor may not - a dead coolant sensor
+-- must trip the interlock, not delete it.
+function rlogic.blind(r)
+  local gone = {}
+  for _, key in ipairs(rlogic.SAFETY) do
+    if r[key] == nil then gone[#gone + 1] = key end
+  end
+  if #gone == 0 then return nil end
+  return table.concat(gone, ",")
+end
+
 -- first tripped interlock as a human-readable cause, or nil if all clear.
--- Readings that are missing (nil) don't trip: a monitor-only setup with a
--- partial adapter still reports what it can.
+-- Readings that are missing (nil) don't trip HERE: breach() serves the
+-- monitor-only display. Control paths (step/canStart) pair it with
+-- blind() so missing readings scram instead of passing silently.
 function rlogic.breach(r, limits)
   local L = limits or rlogic.LIMITS
   if r.damage and r.damage > L.damageMax then
@@ -62,8 +83,11 @@ function rlogic.newState()
 end
 
 -- may the operator start? A latch needs force; an active breach is an
--- absolute no, force or not.
+-- absolute no, force or not. Blindness is breach-class: you cannot
+-- start a reactor you cannot see, and force does not grant sight.
 function rlogic.canStart(state, r, force)
+  local blind = rlogic.blind(r)
+  if blind then return false, "blind: no reading for " .. blind end
   local b = rlogic.breach(r)
   if b then return false, "unsafe: " .. b end
   if state.latched and not force then
@@ -85,7 +109,21 @@ end
 --   { setBurn = <rate> }    ramp step toward target (up: +RAMP, down: immediate)
 --   { }                     steady state
 function rlogic.step(state, r)
-  if not r.running then return {} end
+  -- "active" = confirmed running, OR status unreadable while fuel is
+  -- visibly burning - a controller must not go passive just because
+  -- getStatus died while the core is hot
+  local active = r.running or (r.running == nil and (r.actual or 0) > 0)
+  if not active then return {} end
+  -- FAIL-CLOSED: a live reactor with an incomplete safety picture
+  -- scrams. The old behavior (missing reading = interlock silently
+  -- removed) is the exact failure three audits flagged.
+  local blind = rlogic.blind(r)
+  if blind then
+    state.latched = true
+    state.cause = "blind: no reading for " .. blind
+    state.target, state.lastSet = 0, 0
+    return { scram = state.cause }
+  end
   local b = rlogic.breach(r)
   if b then
     state.latched = true

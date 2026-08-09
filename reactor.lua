@@ -205,9 +205,19 @@ local function keyLoop()
 end
 
 draw(read())
-local _, msg = pcall(function() return select(2, parallel.waitForAny(safetyLoop, keyLoop)) end)
+local okRun, msg = pcall(function() return select(2, parallel.waitForAny(safetyLoop, keyLoop)) end)
+-- GUARANTEED SCRAM ON ABNORMAL EXIT (outside audit, adopted): Ctrl+T,
+-- a Lua error, or any surprise ending scrams the core. The ONLY exit
+-- that leaves the reactor hot is the deliberate [Q] detach.
+local detached = okRun and type(msg) == "string" and msg:find("DETACHED")
+if not detached and fns.scram then pcall(fns.scram) end
 term.setBackgroundColor(colors.black)
 term.setTextColor(colors.white)
 term.clear()
 term.setCursorPos(1, 1)
-print("reactor controller stopped")
+if detached then
+  print(msg)
+else
+  print("reactor controller stopped - core scrammed on exit")
+  if not okRun then print("(exit cause: " .. tostring(msg) .. ")") end
+end

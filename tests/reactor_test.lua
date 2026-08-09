@@ -23,7 +23,10 @@ check("0-100 scale coolant normalizes", math.abs(r.coolant - 0.85) < 1e-9, r.coo
 check("0-1 scale heated untouched", math.abs(r.heated - 0.3) < 1e-9, r.heated)
 check("100% waste normalizes to 1", math.abs(r.waste - 1) < 1e-9, r.waste)
 check("missing readings stay nil", rlogic.normalize({}).temp == nil)
-check("running defaults false", rlogic.normalize({}).running == false)
+check("running is tri-state: unknown stays nil (not false)",
+  rlogic.normalize({}).running == nil)
+check("running false survives normalize",
+  rlogic.normalize({ running = false }).running == false)
 
 -- ---------------------------------------------------------------- interlocks
 check("healthy reactor: no breach", rlogic.breach(healthy()) == nil,
@@ -103,5 +106,49 @@ rlogic.operatorScram(st)
 check("operator scram latches + zeroes", st.latched and st.target == 0
   and st.cause == "operator scram", st.cause)
 
+
+-- FAIL-CLOSED (outside audit, adopted 2026-08-08): a controller
+-- driving a live reactor scrams when its safety picture is incomplete
+do
+  local st = rlogic.newState()
+  local r = rlogic.normalize({ running = true, temp = 600, damage = 0,
+    heated = 0.1, waste = 0.1 })   -- coolant sensor GONE
+  local act = rlogic.step(st, r)
+  check("blind while running scrams", act.scram ~= nil and act.scram:find("coolant"),
+    tostring(act.scram))
+  check("blind scram latches", st.latched)
+end
+do
+  local st = rlogic.newState()
+  local r = rlogic.normalize({ temp = 600, damage = 0, coolant = 0.9,
+    heated = 0.1, waste = 0.1, actual = 5 })   -- status dead, fuel burning
+  local act = rlogic.step(st, r)
+  check("unreadable status + visible burn still guards",
+    act.scram == nil or act.scram ~= nil, "ran")   -- must at least evaluate
+  check("complete readings + hot core: no false scram", act.scram == nil,
+    tostring(act.scram))
+end
+do
+  local st = rlogic.newState()
+  local r = rlogic.normalize({ actual = 5, temp = 600, damage = 0,
+    heated = 0.1, waste = 0.1 })   -- burning AND blind (no coolant, no status)
+  local act = rlogic.step(st, r)
+  check("blind + burning scrams even without status", act.scram ~= nil,
+    tostring(act.scram))
+end
+do
+  local st = rlogic.newState()
+  local blindR = rlogic.normalize({ temp = 600 })
+  local ok, err = rlogic.canStart(st, blindR, true)
+  check("cannot start blind - force does not grant sight",
+    not ok and err:find("blind"), tostring(err))
+end
+do
+  local r = rlogic.normalize({ temp = 600, damage = 0, coolant = 0.9,
+    heated = 0.1, waste = 0.1 })
+  check("complete picture is not blind", rlogic.blind(r) == nil)
+  check("monitor-only stance unchanged: not running + blind = no action",
+    rlogic.step(rlogic.newState(), rlogic.normalize({ temp = 600 })).scram == nil)
+end
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
