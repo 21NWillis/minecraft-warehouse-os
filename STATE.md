@@ -20,6 +20,17 @@ disagree, this file wins and the planning doc is stale.
   Dyson battery and an airship confirmed in the census.
 - 2026-08-08: clutch pedal hotline operational (voice in, Ava out);
   operator can talk to the Board hands-free from any game.
+- 2026-08-08 evening: **THE PACK UPDATE LANDED — "The Uhhhh That What"
+  v1.0.3** (NeoForge 21.1.241, 430 mods). New instance imported;
+  settings/Lens/configs/resourcepacks/repo-clone/Claude-memory all
+  migrated. CONFIRMED IN: Advanced Peripherals, paperclip-0.1.0 +
+  paperclipos-0.1.0 as pack overrides (our mods are server-canon),
+  Create Big Cannons + cbcperipheral (CC-driven artillery!), RFTools
+  suite, Draconic Evolution, CC:DirectGPU, Distant Horizons, Open
+  Parties and Claims (claims system CHANGED - suspect for reported
+  issues). Removed: pipeorgans, matmores. update_day.md runbook is
+  now ACTIVE - first launch pending. Old instance retired; work from
+  "The Uhhhh That What" going forward.
 - 2026-08-08: **SHARD 1 FLOWN** — the first deck tile (32x16
   obsidian, 512 blocks, under the storage hub) built by F8 while the
   operator sat in a VC, muted, pedal-talking to the Board. The
