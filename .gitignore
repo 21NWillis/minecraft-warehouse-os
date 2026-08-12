@@ -7,3 +7,6 @@ paperclip/.gradle/
 
 lens/build/
 lens/.gradle/
+
+*.key
+openrouter.key
