@@ -369,6 +369,43 @@ budget. Batch draws, sync once per frame, low res until proven.
 nocboard v2 = tm_gpu raster dashboard; PNG decode means pre-rendered
 assets can ship from GitHub.
 
+## Armament Division: broken renewable ranged weapons (agent report,
+2026-08-12; user directive: prefer REAL BOWS this pack, not crossbows)
+
+**Fastest broken overall [C mechanics]:** Apotheosis-reforged vanilla
+crossbow, hours 2-6 — Salvaging→Reforging tables, Spectral/crit/
+armor-pierce affixes, Apothic Enchanting lvl-100 table with
+**Crescendo of Bolts** (extra shots, no ammo) + **Endless Quiver**
+(infinite arrows). Scales via World Tiers (Haven→Pinnacle, CTRL+T;
+higher tier = better Mythic odds, Tier Augments cost Max Eterna).
+User is bow-gang this pack, so this is reference-only.
+
+**The BOW plan:**
+- Hour 1 stopgap: Iron's Spells Firebolt scroll in a Flimsy Journal
+  (Wizard Towers near villages; mana = infinite ammo). 3/5.
+- Mid-game centerpiece (~6-10h): **Twilight Forest Tri-bow** — Snow
+  Queen drop (Aurora Palace, after Lich→Minoshroom/Hydra chain), a
+  REAL bow firing 3 arrows for 1 ammo; takes full Apotheosis affix/
+  gem/augment stack + over-cap Power + Endless Quiver. 4/5. Same boss
+  alternatively drops the **Seeker Bow** (homing) — user theorycraft:
+  seeker + multishot + drawspeed = boss-deleter but a farm-safety
+  hazard (homing + fast fire = cow genocide in one right click);
+  UNKNOWN whether seeker arrows filter hostiles — verify in-game.
+  Doctrine if not: two-loadout (seeker = regulated boss ordnance,
+  directional bow = daily driver).
+- Endgame: **Silent Gear bow, max-grade ATM-alloy limbs** (ATM/Vib/
+  Unob are registered SG materials) + Apotheosis stack — community
+  "one-shot Withers" build [L, strong]. SG limb materials are
+  narrow (Crimson/Tyrian Steel best natives, GH #513); grading via
+  Material Grader (MC grade), ATM10 bug: re-smelting graded ingots
+  wipes grade (#2828). Repair kits forever + Endless Quiver.
+- Sidearm: **Cataclysm Laser Gatling** (Harbinger boss → Witherite;
+  full magazine recharges on 1 redstone) 4.5/5 once nether-star-boss
+  capable; Harbinger is re-summonable = farmable.
+- Dead ends: MystAg bows don't exist in 1.21; Mek Electric Bow still
+  eats arrows; PneumaticCraft minigun has a real ammo economy; potato
+  cannon = 2/5 meme (air-tank durability trick is cute).
+
 ## QoL staging (done)
 
 7 jars staged in `<ATM10 instance>\mods-qol-staged\` + MANIFEST.md:
