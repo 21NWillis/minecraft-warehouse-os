@@ -180,3 +180,152 @@ AP/RS2 bugs; ATM10 gate graph (allthemodium/occultism kubejs); RS2
 autocrafting internals (does it already parallelize externals better
 than RS1?); toms-peripherals API; income faucet shortlist; snow-globe
 prototype scoping.
+
+---
+
+# Day-grind findings (2026-08-12)
+
+## RS Bridge × RS2 — research report (web/source-verified)
+
+**The big one: RS2 does NOT parallelize external crafting.** A task's
+external steps lock to the single Autocrafter holding the chosen
+pattern; duplicate patterns for the same output resolve by priority to
+one machine (RS2 #952). The mini-PC dispatcher design is therefore
+VALIDATED as the only route to parallel machine banks — not an
+optimization, the mechanism. (Possible alt: many small craftItem jobs
+against duplicate patterns — UNKNOWN if concurrent tasks pick different
+machines; test in-game.) RS 2.0.7 already fixed the
+concurrent-tasks-through-one-external-machine stuck bug, so our
+many-small-jobs pattern lands on patched ground.
+
+**craftItem semantics (AP 0.7.62b, source-verified):**
+- Returns a **CraftingJob object immediately**; RS2 preview calc runs
+  async. Non-nil ≠ success — failures surface via `job.getMissingItems()`
+  or the **`rs_crafting` event**: `os.pullEvent("rs_crafting")` →
+  `(ev, error, id, debug_message)`, fires on CALCULATION_STARTED /
+  MISSING_ITEMS / JOB_DONE / JOB_CANCELED. Event delivery has an open
+  issue history (#688) — poll `job.isDone()` as fallback.
+- Job API: getId, isDone, isCanceled, getMissingItems, cancel.
+  AP detects "canceled" as absence-from-statuses — a done task also
+  leaves; check isDone before concluding canceled (race, needs test).
+- Peripheral type name: **`rs_bridge`**. Trust the JAR for method names
+  (listDrives/listCells) — 0.7 docs partially describe newer builds.
+  `getCrafters()` (autocrafter enumeration) lands in 0.7.63b+ (PR #826).
+
+**Filter table (1.21, from ItemFilter.java):** keys = `name` (id or
+`#tag`), `count` (default 64), `components` (REPLACES `nbt`; exact-match
+against the FULL component patch — partial matches fail), `fingerprint`
+(MD5; overrides everything; get via getItems() field or
+/advancedperipherals getHashItem), `fromSlot`/`toSlot`. Use fingerprint
+for any item with components; components-tables only for exact known
+patches.
+
+**Landmines:**
+- **count=1 clamp**: craftable items with 0 stored report count 1
+  (client-crash workaround in RSApi). NEVER presence-check by count;
+  cross-check getCraftableItems.
+- getCraftableItems = outputs of patterns INSERTED IN AUTOCRAFTERS
+  network-wide; patterns sitting in a Pattern Grid don't count.
+- Keep craft request counts modest — RS2 had runaway-CPU calc on huge
+  trees (#1018, ATM10-reported); improved but unproven at 2.0.9.
+- Autocrafter chaining (face-to-face for >9 patterns) had a
+  first-in-chain-only bug (#808) — verify in 2.0.9 before relying.
+- Task progress numbers approximate (AP works around an RS2 "stored"
+  attr bug by subtraction).
+
+**RS2 block vocabulary:** Crafter → **Autocrafter** (faces its machine,
+front-face chains), encode in **Pattern Grid**, watch tasks in
+**Autocrafting Monitor**, fleet view in **Autocrafter Manager**.
+Per-Autocrafter lock modes: never / redstone-pulse / machine-empty /
+all-outputs-received / high-low signal — machine-empty is the one for
+mixed-input machines.
+
+**First in-game test checklist:** (1) craftItem with missing
+ingredients → event vs silence; (2) duplicate pattern in 2 Autocrafters
+on 2 machines, 2 concurrent jobs → both machines used?; (3) confirm
+count=1 clamp; (4) components exact-match failure on enchanted book;
+(5) done-vs-canceled ordering race.
+
+Full sources: AP PRs/issues #684 #688 #754 #775 #795 #816 #826, RSApi/
+RSCraftJob/ItemFilter source on dev/1.21.1, RS2 changelog + issues #808
+#952 #1018, docs.advanced-peripherals.de 0.7 guides, refinedmods.com
+autocrafter docs.
+
+## ATM10 gate graph + break-things map (web-researched, sources in
+agent report; [C]=confirmed multi-source, [L]=community lore)
+
+**The spine [C]:** netherite pick → **Allthemodium** (Deep Dark
+below ~Y-40, glowing; or brush Suspicious Clay in Ancient Cities →
+ore + smithing template) → ATM nuggets → Teleport Pad: Overworld
+placement = **Mining Dim** (ATM in deepslate layer ~Y112-129), Nether
+placement = **The Other** → ATM pick → **Vibranium** (Nether
+crimson/warped ceilings) → Vib pick → **Unobtainium** (End Highlands
+post-dragon; templates ONLY from Library of Dungeons in The Other).
+**LAW [C]: spine ores drop for real players only — no quarry, no
+Occultism miner, no fake player (ATM-10 #858, intentional).** Hand-mine
+the spine once; automate everything else.
+
+**The recurring tax [C]: Piglich Hearts** (elite mobs in The Other) —
+in all 3 ATM alloys + Dragon Soul. ATM alloys also gate: Powah
+Energizing Orb @ 1B FE/ingot, Ars Nouveau apparatus @ 10k Source,
+IF Dissolution Chamber + Soul Lava. ATM Star = Runic Star Altar, 8
+components + 3 alloys; master gates = Mekanism antimatter, AE2
+singularity, Powah, Ars source economy, IF soul lava, Cataclysm
+bosses, MystAg insanium, wither farm. MystAg tiers gate resources,
+not the spine (ATM-metal SEEDS exist [C] — the legal bypass for
+repeat acquisition).
+
+**Break-things ratings (how broken / notes):**
+- **HNN loot fabrication 5/5 [C mechanism]**: level a Deep Learner on
+  a mob ~dozens of kills → Simulation Chambers print its loot from
+  RF + polymer clay forever. **Piglich model = hearts from
+  electricity.** The strainer-casino spiritual successor.
+- **Drygmy milking + Apothic Spawners 5/5 [C]**: drygmys extract drops
+  from LIVING caged mobs, no kills; jar one piglich (Tablet of
+  Containment) → ~20 drygmys ≈ 32 hearts/cycle passive. Apothic
+  Spawner modifiers (min delay, no-AI, ignore-player) = elite conveyor.
+- **Productive Bees ATM bees 5/5 late-mid [C exists]**: the ONLY
+  automation for spine metals — Ancient Bee spawn eggs + cast molten
+  ATM metal on egg in Productive Metalworks foundry → metal bee →
+  comb → centrifuge → ingots forever. (CC BEES ANGLE: this is the
+  wing the user wants; dispatcher-friendly plain inventories, see
+  agent 3 report.)
+- **Occultism miner spirits 4/5 [C]**: passive virtual-dim ore stream,
+  early-reachable, capped (no spine metals). Crusher spirits = best
+  early ore multiplication.
+- **Apotheosis World Tiers + gem/salvage flywheel 4/5 [C features]**;
+  Apoth flight potions = early creative-ish flight, trivializes
+  exploration gates.
+- **MystAg inferium→insanium 4/5 [C]** "biggest unlock" per guides;
+  Time in a Bottle on growth accelerators.
+- **EvilCraft Vengeance Pick (Fortune V, buyable early) 3/5 [C]** —
+  triples the first hand-mined spine veins. Blood Chest = free repair.
+- **Mek Digital Miner AFK 3/5**, **wind >Y100 + Player Transmitter
+  power cheese 2/5**, **Soul Lava thermo 9x [C]**.
+- **Actual dupes (0/5 legitimacy)**: rolling patched history (Pocket
+  Storage #199, Router+briefcase #992, suspicious-block #2299,
+  Toolbox+Bundle #3565/#4147) — social decision on a friend server,
+  assume patched, don't build on them.
+- Gravel/sieve economies are ATM10-To-The-Sky ONLY — not in base pack.
+
+**Week-one faucet order [C]:** copper Ore Hammer (hour one, free ore
+doubling) → inferium field 30+ crops → Mek wind row >Y100 + Player
+Transmitter → Create cobbleworks → Occultism crusher→miner spirits →
+HNN corner as soon as RF + mob farm exist → wild bee nests early
+(feeds the eventual ATM-bee wing). MineColonies supply camp = free
+day-one loot. Strainer-era mapping: inferium field = strainers, HNN +
+drygmys = emerald printer, ATM bees = endgame version.
+
+**Version caveat:** ATM10 patches monthly; dupe list + piglich drop
+behavior are version-sensitive — re-verify vs the server's pinned
+pack version.
+
+## QoL staging (done)
+
+7 jars staged in `<ATM10 instance>\mods-qol-staged\` + MANIFEST.md:
+Sound Physics Remastered 1.5.1, Chat Heads 0.15.6, BetterF3 11.0.3,
+Equipment Compare 1.3.13, Legendary Tooltips 1.5.5, Inventory HUD+
+3.4.28 (real 8M-download project, impostor dodged), Durability Tooltip
+1.1.6. All four required libs (Cloth Config, Iceberg, Prism, SM642
+ConfigLib) already ship in the pack — zero extra jars. Move into mods/
+after first successful boot.
