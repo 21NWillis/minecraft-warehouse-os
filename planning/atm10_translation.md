@@ -320,6 +320,55 @@ drygmys = emerald printer, ATM bees = endgame version.
 behavior are version-sensitive — re-verify vs the server's pinned
 pack version.
 
+## Compact Machines 7 / Productive Bees / Tom's GPU (agent 3 report)
+
+**CM7 (7.0.81) — the walls are INERT [C]:** the tunnel system
+(item/fluid/energy/redstone) was STRIPPED entirely in the 1.21 rewrite
+(mod FAQ; replacement "Room Upgrades" targeted at CM 9.x, not 7.0.x).
+Nothing passes CM walls natively. Cross-dimension mods are the bridge:
+ender chests/tanks, AE2 quantum bridge, Flux Networks. CC specifics:
+- No wired-modem passthrough, ever (wired nets can't span dimensions).
+- Plain wireless modems DON'T cross dimensions; **ender modems DO** —
+  computer + ender modem inside a room talks to the campus net fine.
+- **Rooms UNLOAD when players leave** (intentional CM7 change, #595).
+  A chunk-loading Room Upgrade reportedly exists in recent 7.0.x —
+  VERIFY IN JEI in-game; also test whether FTB Chunks can claim the CM
+  dim. A computer in an unloaded room is a dead computer.
+- Net: pocket factory halls = possible but logistics go through
+  ender-tech, not walls; snow-globe viewport mod idea unaffected
+  (rendering is our own mod's job) but the "live" capture needs the
+  room chunkloaded.
+
+**Productive Bees (13.13.5) — the apiary wing is CC-shaped [C]:**
+no native CC integration, but the whole line is generic `inventory`
+peripherals via wired modem (pushItems/pullItems): Advanced Beehive
+(output slots; Expansion Boxes raise capacity — own-peripheral status
+needs test), Centrifuge/Powered (comb → items + 10-bucket tank),
+Incubator (baby bee + honey treats → adult; gene imprinting),
+Breeding Chamber (2 caged bees + flower + FE — cage-slot automation
+insertability needs test), Gene Indexer (**redstone-triggered** — CC
+hook), Bottler (dispenser+piston squash line, CC-clockable).
+Player-required: catching bees in cages, initial setup. Everything
+else machine-driven. **Simulation upgrade CONFIRMED in 13.13.x**:
+bees never leave the hive (server-perf win) — one in every hive.
+Pipeline: dispense caged bee → squash → centrifuge → 6 gene types →
+Gene Indexer 100% → treat → Incubator → Breeding Chamber.
+
+**Tom's Peripherals 1.3.1 — real GPU [C from source]:** peripheral
+`tm_gpu` + dumb Bitmap Monitor multiblock (GPU claims horizontally
+adjacent array), `tm_keyboard` (kbd+mouse, works on CC advanced
+monitors too), `tm_rsPort`, `tm_wdt` (watchdog reboot — nice for
+station firmware). GPU: VRAM pool (default 16MiB/GPU, server config),
+32-bit ARGB framebuffer, per-block resolution setSize(16..64)px,
+default screen cap 16x16 blocks → 1024x1024px. API: fill/rect/line/
+drawText/drawImage/decodeImage(PNG!)/newBuffer + full GL1.x-style 3D
+immediate mode; touch events tm_monitor_touch. **Perf law: sync() is
+the cost** — each monitor block ships width² ints in a BE packet per
+flush; bandwidth is the hazard, and drawing runs on the shared Lua
+budget. Batch draws, sync once per frame, low res until proven.
+nocboard v2 = tm_gpu raster dashboard; PNG decode means pre-rendered
+assets can ship from GitHub.
+
 ## QoL staging (done)
 
 7 jars staged in `<ATM10 instance>\mods-qol-staged\` + MANIFEST.md:
