@@ -151,6 +151,42 @@ function M.staleLeftovers(st, hasLeftovers, now)
   return false
 end
 
+-- Slot-level move plan for ONE ingredient set of `key`, given the
+-- buffer's current slot map {slot -> {name=,count=}}. Ingredients may
+-- span multiple source slots (RS pushes interleave). Returns:
+--   moves = { {fromSlot=, toSlot=, count=, name=}, ... }  (nil if the
+--           buffer can't supply a full set)
+--   after = slot map with the consumed items removed (feed it back in
+--           when planning the next set so counts stay honest)
+function M.movePlan(cfg, slots, key)
+  local recipe
+  for _, r in ipairs(cfg.recipes) do
+    if r.key == key then recipe = r break end
+  end
+  if not recipe then return nil, slots end
+  -- work on a copy so a failed plan leaves the caller's view untouched
+  local after = {}
+  for s, it in pairs(slots) do after[s] = { name = it.name, count = it.count } end
+  local moves = {}
+  for _, ing in ipairs(recipe.inputs) do
+    local need = ing.n
+    for s, it in pairs(after) do
+      if need == 0 then break end
+      if it.name == ing.name and it.count > 0 then
+        local take = math.min(need, it.count)
+        moves[#moves + 1] = { fromSlot = s, toSlot = ing.toSlot, count = take, name = ing.name }
+        it.count = it.count - take
+        need = need - take
+      end
+    end
+    if need > 0 then return nil, slots end  -- short a full set; no partial moves
+  end
+  for s, it in pairs(after) do
+    if it.count == 0 then after[s] = nil end
+  end
+  return moves, after
+end
+
 -- Heartbeat snapshot for rednet/craftd v2 (paperclip.station protocol).
 function M.status(st)
   local flight, jams = 0, {}

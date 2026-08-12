@@ -177,5 +177,43 @@ do
   -- the doctrine: stock policy must confirm via stored-only view, never count
 end
 
+-- 12. movePlan: one set, ingredients spanning multiple source slots
+do
+  local c = cfg()
+  local slots = {
+    [1] = { name = "minecraft:iron_ingot", count = 5 },
+    [3] = { name = "minecraft:iron_ingot", count = 3 },
+    [4] = { name = "mekanism:enriched_redstone", count = 2 },
+  }
+  local moves, after = sl.movePlan(c, slots, "infused_alloy")
+  check("movePlan returns moves", moves ~= nil)
+  local ironMoved, rsMoved = 0, 0
+  for _, mv in ipairs(moves) do
+    if mv.name == "minecraft:iron_ingot" then
+      ironMoved = ironMoved + mv.count
+      check("iron routed to slot 1", mv.toSlot == 1, mv.toSlot)
+    else
+      rsMoved = rsMoved + mv.count
+      check("redstone routed to slot 2", mv.toSlot == 2, mv.toSlot)
+    end
+  end
+  check("exactly 8 iron moved across slots", ironMoved == 8, ironMoved)
+  check("exactly 1 redstone moved", rsMoved == 1, rsMoved)
+  check("after-view keeps leftover redstone", after[4].count == 1, after[4] and after[4].count)
+  check("after-view drops emptied slots", after[1] == nil and after[3] == nil)
+  -- second set from the remainder must fail (iron exhausted)
+  local moves2 = sl.movePlan(c, after, "infused_alloy")
+  check("second set correctly unplannable", moves2 == nil)
+end
+
+-- 13. movePlan: failed plan leaves the caller's slot view untouched
+do
+  local c = cfg()
+  local slots = { [1] = { name = "minecraft:iron_ingot", count = 4 } }
+  local moves, after = sl.movePlan(c, slots, "infused_alloy")
+  check("short buffer plans nothing", moves == nil)
+  check("failed plan mutates nothing", after[1].count == 4, after[1].count)
+end
+
 print(("\n%d passed, %d failed"):format(passed, failed))
 if failed > 0 then os.exit(1) end
