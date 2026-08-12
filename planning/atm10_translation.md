@@ -406,6 +406,47 @@ User is bow-gang this pack, so this is reference-only.
   eats arrows; PneumaticCraft minigun has a real ammo economy; potato
   cannon = 2/5 meme (air-tank durability trick is cute).
 
+## Design drafts (2026-08-12 evening tick)
+
+**station.lua spec drafted** → planning/atm10_station_spec.md (buffer/
+machine-bank/importer topology, set-parsing under interleaved task
+pushes, jam watchdog, stationlogic pure-logic split, mock_rsbridge
+test plan). Key call: stations never touch the RS Bridge — RS-side
+completion accounting via the importer; the single bridge belongs to
+craftd v2 (telemetry + stock policy + rs_crafting watching).
+
+**nocboard v2 sketch (tm_gpu):** one GPU + monitor wall (start 8x4
+blocks @ 32px = 256x128, scale up after perf proof). Frame loop:
+gather (budgeted bridge calls: storage %, energy in/out via
+getAverageEnergyInput, task list, station heartbeats via rednet
+registry) → draw fully batched into VRAM → ONE sync() per frame,
+target 1-2 fps initially (sync bandwidth is the law). decodeImage
+(PNG) means logo/iconography ships as assets from GitHub raw —
+the corp gets a real brand identity on a real framebuffer. Exchange
+ticker ports from nocboard v1 (emc.txt fiction intact). tm_wdt
+watchdog on the NOC computer = free crash recovery.
+
+**Snow-globe viewport mod scope:** Phase 1 client-only MVP — BER on a
+companion "display case" block rendering a STATIC captured structure
+(exported schematic) scaled 1/16 under glass; reuses Lens ghost-render
+pipeline; zero server adoption needed; proves the render perf story
+(bake to vertex buffer on capture, never per-frame block walks).
+Phase 2 live: small server component captures CM room interior
+(StructureTemplate over room bounds) on timer/change → packet →
+client rebakes. Needs room chunkloaded (CM7 Room Upgrade chunkloader
+— verify in JEI). Commune server = friendly adoption odds.
+
+**Autocrank (user-ratified concept, build only if crossbow wins):**
+client-side NeoForge mod managing crossbow charge state — read
+charged_projectiles component; on fire-press with empty crossbow,
+synthesize use-key hold for the item's actual use duration (reads
+drawspeed-modified getUseDuration), release, then pass through fire
+clicks while charged. Turns state-dependent pulse-width clicking into
+pure mashing. NOT a speed hack — server still validates full charge
+ticks; it automates the hold, doesn't shorten it. User's fairness
+read: "just minecraft ease of use, thats what like 250 of the 500
+mods in the pack are." Commune-ratification item regardless.
+
 ## QoL staging (done)
 
 7 jars staged in `<ATM10 instance>\mods-qol-staged\` + MANIFEST.md:
