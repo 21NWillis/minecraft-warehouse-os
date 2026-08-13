@@ -13,6 +13,7 @@ param(
   [string]$System = "You are an outside consultant reviewing planning documents for a Minecraft automation project. Be concrete, cite the doc you are reacting to, and separate 'verified by the docs' from 'my speculation'. The house model holds doctrine; your job is ideas it might be sleeping on.",
   [string]$Out = "",
   [int]$MaxTokens = 16000,
+  [string]$ReasoningEffort = "",   # low|medium|high - bound a reasoning model's thinking budget
   [string]$ListModels = ""
 )
 
@@ -47,21 +48,28 @@ foreach ($f in $Files) {
 $userMsg = $Prompt
 if ($docBlock) { $userMsg = $Prompt + "`n`nDocuments follow." + $docBlock }
 
-$payload = @{
+$payloadTable = @{
   model      = $Model
   max_tokens = $MaxTokens
   messages   = @(
     @{ role = "system"; content = $System },
     @{ role = "user";   content = $userMsg }
   )
-} | ConvertTo-Json -Depth 6
+}
+if ($ReasoningEffort) { $payloadTable.reasoning = @{ effort = $ReasoningEffort } }
+$payload = $payloadTable | ConvertTo-Json -Depth 6
 
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
 $resp = Invoke-RestMethod -Uri "https://openrouter.ai/api/v1/chat/completions" -Method Post -Headers $headers -Body $bytes
 
-$text = $resp.choices[0].message.content
+$msg = $resp.choices[0].message
+$text = $msg.content
 $usage = $resp.usage
-Write-Host ("--- {0} | prompt {1} tok, completion {2} tok" -f $Model, $usage.prompt_tokens, $usage.completion_tokens)
+Write-Host ("--- {0} | prompt {1} tok, completion {2} tok | finish: {3}" -f $Model, $usage.prompt_tokens, $usage.completion_tokens, $resp.choices[0].finish_reason)
+if ((-not $text) -and $msg.reasoning) {
+  Write-Warning "content empty but reasoning present - model spent its budget thinking. Raise -MaxTokens or set -ReasoningEffort low."
+  $text = "[NO FINAL ANSWER - reasoning trace follows]`n`n" + $msg.reasoning
+}
 
 if ($Out) {
   [System.IO.File]::WriteAllText((Join-Path (Get-Location) $Out), $text, (New-Object System.Text.UTF8Encoding($false)))
