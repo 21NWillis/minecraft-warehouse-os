@@ -125,3 +125,20 @@ drives die; the repo survives.
 - **Session memory dies with drives** (hit-me, 2026-08). The repo is
   the only memory that survives. Doctrine, decisions, and bites live
   in committed files — this one included.
+
+
+## Extreme Reactors 2 (the 7x7 shame, 2026-08-13)
+
+- **BASIC tier multiblocks have HARD SIZE CAPS: reactor max 5x5x5,
+  turbine max 5x5x10. Only Reinforced is size-unlimited.** An
+  over-size Basic structure fails SILENTLY - no GUI, no chat message,
+  no assembly error; the controller right-click does literally
+  nothing. Claude spec'd a 7x7x5 Basic reactor from memory; the
+  operator built it faithfully (twice audited it, vein-mined the
+  interior to recount blocks) and burned an hour debugging a
+  blueprint that was illegal at authoring time. Law: BEFORE speccing
+  any multiblock, verify the tier's size cap against the mod page or
+  in-game manual - and when a multiblock is silent (vs telling you
+  what's wrong), suspect the SPEC first, the operator's assembly
+  LAST. Corollary: Basic tier has no Computer Port either -
+  Reinforced only.
