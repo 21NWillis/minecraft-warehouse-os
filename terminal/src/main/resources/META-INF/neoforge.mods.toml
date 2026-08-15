@@ -4,7 +4,7 @@ license = "MIT"
 
 [[mods]]
 modId = "paperclipos"
-version = "0.1.0"
+version = "0.1.1"
 displayName = "PaperclipOS Terminal"
 description = "The Paperclip Terminal: a real ordering UI for the warehouse crafting fleet. The GUI is the face; the CC computers stay the brain."
 authors = "nlwillis + Claude"
@@ -29,3 +29,4 @@ type = "required"
 versionRange = "[1.21.1]"
 ordering = "NONE"
 side = "BOTH"
+
