@@ -88,3 +88,4 @@ data/tour_campus.lua
 meprobe.lua
 orderd.lua
 stationgen.lua
+stockd.lua
