@@ -89,3 +89,4 @@ meprobe.lua
 orderd.lua
 stationgen.lua
 stockd.lua
+stock_cfg.lua
