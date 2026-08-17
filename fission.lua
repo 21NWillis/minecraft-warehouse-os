@@ -12,8 +12,28 @@
 local TEMP_WARN   = 800    -- K: hold burn, no increases
 local TEMP_SCRAM  = 1000   -- K: scram (200K of margin below damage)
 local WASTE_SCRAM = 0.90   -- waste tank fraction full
-local COOL_SCRAM  = 0.10   -- coolant fraction empty line
+-- coolant gates are ABSOLUTE mB: the API's FilledPercentage uses a
+-- denominator that disagrees with the visible tank (field-found
+-- 2026-08-16), so ratios are untrustworthy. 200k mB = one tick of
+-- sodium flow at burn 1; anything above it circulates fine.
+local COOL_PREFLIGHT_MB = 200000
+local COOL_SCRAM_MB     = 100000
 local LOOP_S      = 1
+
+-- coolant amount reader: the adapter may return a number or a
+-- {name=..., amount=...} table depending on version
+local function coolantAmount(r)
+  for _, fn in ipairs({ "getCoolant", "getCoolantAmount" }) do
+    if type(r[fn]) == "function" then
+      local ok, v = pcall(r[fn])
+      if ok then
+        if type(v) == "number" then return v end
+        if type(v) == "table" and v.amount then return v.amount end
+      end
+    end
+  end
+  return nil
+end
 
 local args = { ... }
 
@@ -61,11 +81,12 @@ if temp == nil then
   print("preflight FAIL: temperature unreadable - not igniting blind")
   return
 end
-local coolant = call(reactor, "getCoolantFilledPercentage")
-if coolant ~= nil and coolant < COOL_SCRAM then
-  print(("preflight FAIL: coolant at %d%% - prime the water loop first"):format(coolant * 100))
+local coolant = coolantAmount(reactor)
+if coolant ~= nil and coolant < COOL_PREFLIGHT_MB then
+  print(("preflight FAIL: %d mB sodium (< %d mB) - keep the brine flowing"):format(coolant, COOL_PREFLIGHT_MB))
   return
 end
+print(("preflight: %s mB sodium aboard"):format(tostring(coolant)))
 
 call(reactor, "setBurnRate", burnTarget)
 local ok = pcall(function() reactor.activate() end)
@@ -77,7 +98,7 @@ while true do
   local t   = call(reactor, "getTemperature")
   local dmg = call(reactor, "getDamagePercent")
   local wst = call(reactor, "getWasteFilledPercentage")
-  local col = call(reactor, "getCoolantFilledPercentage")
+  local col = coolantAmount(reactor)
   local act = call(reactor, "getStatus")
 
   if t == nil then
@@ -92,8 +113,8 @@ while true do
   elseif wst ~= nil and wst >= WASTE_SCRAM then
     scram(("waste %d%% full - barrels!"):format(math.floor(wst * 100)))
     break
-  elseif col ~= nil and col <= COOL_SCRAM then
-    scram(("coolant %d%% - water loop failed"):format(math.floor(col * 100)))
+  elseif col ~= nil and col <= COOL_SCRAM_MB then
+    scram(("coolant %d mB - sodium loop failed"):format(col))
     break
   end
 
@@ -105,9 +126,9 @@ while true do
   if now - lastBeat >= 5 then
     lastBeat = now
     local prod = call(turbine, "getProductionRate")
-    local line = ("%dK | dmg %s%% | waste %d%% | coolant %d%% | %s"):format(
+    local line = ("%dK | dmg %s%% | waste %d%% | sodium %s mB | %s"):format(
       math.floor(t), tostring(dmg or 0), math.floor((wst or 0) * 100),
-      math.floor((col or 0) * 100),
+      tostring(col or "?"),
       prod and (tostring(math.floor(prod)) .. " prod") or "turbine n/a")
     print(line)
     rednet.broadcast({ station = "fission", kind = "telemetry",
