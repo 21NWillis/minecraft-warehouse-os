@@ -92,3 +92,4 @@ stockd.lua
 stock_cfg.lua
 govern.lua
 reactorlab.lua
+fission.lua
