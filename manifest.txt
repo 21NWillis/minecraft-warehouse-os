@@ -91,3 +91,4 @@ stationgen.lua
 stockd.lua
 stock_cfg.lua
 govern.lua
+reactorlab.lua
