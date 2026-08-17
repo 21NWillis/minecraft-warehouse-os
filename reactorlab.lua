@@ -44,7 +44,12 @@ emit("rods: " .. tostring(call(reactor, "getNumberOfControlRods")))
 if turbine then
   call(turbine, "setActive", true)
   call(turbine, "setVentAll")                     -- infinite sink mode
-  call(turbine, "setInductorEngaged", false)
+  -- coils ENGAGED during the sweep: pure drag bonus that bounds rotor
+  -- RPM (vent-all still torques the rotor - learned at 2600 RPM).
+  -- Overspeed is an efficiency loss, not destruction (no damage code
+  -- in the jar; tooltip's "may fail catastrophically" is flavor), but
+  -- a bounded rotor is still better instrumentation.
+  call(turbine, "setInductorEngaged", true)
   local hard = call(turbine, "getMaxIntakeRateHardLimit")
   call(turbine, "setFluidFlowRateMax", hard or 2000)
   emit(("turbine sink: intake hard limit %s mB/t, blades %s"):format(
